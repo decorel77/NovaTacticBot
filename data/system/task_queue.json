@@ -724,7 +724,7 @@
     "title": "Regime bias detector",
     "phase": "PHASE_6",
     "phase_name": "Regime Analytics",
-    "status": "TODO",
+    "status": "DONE",
     "priority": "P1",
     "risk": "LOW",
     "task_type": "analytics",
@@ -1810,6 +1810,7 @@
     "live_trading_readiness": "not_applicable"
   }
 ]
+
 
 
 

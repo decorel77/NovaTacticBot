@@ -182,6 +182,23 @@ class StrategyStreakStats:
 
 LOSS_STREAK_FLAG_THRESHOLD = 3
 EDGE_EROSION_THRESHOLD_PP = 0.10   # 10 percentage points below baseline triggers warning
+REGIME_BIAS_MULTIPLIER = 2.0       # trade frequency > 2x expected base rate triggers flag
+
+
+@dataclass
+class RegimeBiasWarning:
+    regime: str
+    observed_rate: float    # fraction of trade outcomes in this regime
+    expected_rate: float    # fraction of all events in this regime (base rate)
+    multiplier: float       # observed / expected
+
+
+@dataclass
+class RegimeBiasAnalysis:
+    """Detects systematic over-trading in specific market regimes."""
+    warnings: list[RegimeBiasWarning] = field(default_factory=list)
+    regime_trade_rates: dict[str, float] = field(default_factory=dict)
+    regime_base_rates: dict[str, float] = field(default_factory=dict)
 
 
 @dataclass
@@ -219,6 +236,7 @@ class AnalyticsResult:
     rolling_win_rates: RollingWinRates = field(default_factory=RollingWinRates)
     streak_analysis: StreakAnalysis = field(default_factory=StreakAnalysis)
     edge_erosion: EdgeErosionAnalysis = field(default_factory=EdgeErosionAnalysis)
+    regime_bias: RegimeBiasAnalysis = field(default_factory=RegimeBiasAnalysis)
     open_questions: list[str] = field(default_factory=list)
     observations: list[str] = field(default_factory=list)
 
@@ -249,6 +267,7 @@ class TacticAnalyticsEngine:
         self._rolling_win_rates(events, result)
         self._streak_analysis(events, result)
         self._edge_erosion_analysis(result)
+        self._regime_bias_analysis(events, result)
         self._generate_observations(result)
 
         return result
@@ -513,6 +532,53 @@ class TacticAnalyticsEngine:
             w.finalize()
             result.rolling_win_rates.by_strategy_last_10[sid] = w
 
+    def _regime_bias_analysis(self, events: list[TacticalEvent], result: AnalyticsResult) -> None:
+        """Detect over-trading in specific regimes relative to base rate.
+
+        Base rate = fraction of all events in a regime.
+        Trade rate = fraction of TRADE_OUTCOME events in that regime.
+        Flag when trade_rate / base_rate > REGIME_BIAS_MULTIPLIER.
+        """
+        rb = result.regime_bias
+        total_events = len(events)
+        if total_events == 0:
+            return
+
+        trade_outcomes = [e for e in events if e.event_type == EventType.TRADE_OUTCOME]
+        total_trades = len(trade_outcomes)
+        if total_trades == 0:
+            return
+
+        # Count all events per regime (base rate denominator)
+        regime_event_counts: dict[str, int] = {}
+        for e in events:
+            regime = e.regime or "UNKNOWN"
+            regime_event_counts[regime] = regime_event_counts.get(regime, 0) + 1
+
+        # Count trade outcomes per regime
+        regime_trade_counts: dict[str, int] = {}
+        for e in trade_outcomes:
+            regime = e.regime or "UNKNOWN"
+            regime_trade_counts[regime] = regime_trade_counts.get(regime, 0) + 1
+
+        for regime, event_count in regime_event_counts.items():
+            base_rate = event_count / total_events
+            trade_count = regime_trade_counts.get(regime, 0)
+            trade_rate = trade_count / total_trades
+
+            rb.regime_base_rates[regime] = base_rate
+            rb.regime_trade_rates[regime] = trade_rate
+
+            if base_rate > 0:
+                multiplier = trade_rate / base_rate
+                if multiplier > REGIME_BIAS_MULTIPLIER:
+                    rb.warnings.append(RegimeBiasWarning(
+                        regime=regime,
+                        observed_rate=trade_rate,
+                        expected_rate=base_rate,
+                        multiplier=multiplier,
+                    ))
+
     def _edge_erosion_analysis(self, result: AnalyticsResult) -> None:
         """Compare per-strategy rolling last-10 win rate against overall baseline.
 
@@ -622,6 +688,12 @@ class TacticAnalyticsEngine:
             oq.append(
                 "High-score recommendations have a lower win rate than low-score recommendations. "
                 "Score calibration may need review."
+            )
+
+        for w in result.regime_bias.warnings:
+            obs.append(
+                f"REGIME_BIAS: Regime '{w.regime}' has {w.multiplier:.1f}x expected trade frequency "
+                f"(observed {w.observed_rate:.0%}, expected {w.expected_rate:.0%})."
             )
 
         for w in result.edge_erosion.warnings:
