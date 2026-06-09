@@ -1,6 +1,6 @@
 {
   "bot": "NovaTacticBot",
-  "version": "1.0",
+  "version": "1.1",
   "last_updated": "2026-06-09",
   "phases": [
     {
@@ -21,11 +21,16 @@
       "phase_id": "ADAPTER_LAYER",
       "name": "Adapter Layer",
       "status": "COMPLETE",
-      "description": "Base adapter interface and NovaBotV2Options adapter",
+      "description": "Base adapter interface, generic OptionsAdapter, and real NovaBotV2OptionsAdapter",
       "tasks": [
         { "id": "A-001", "name": "Create BaseAdapter abstract class", "status": "COMPLETE" },
         { "id": "A-002", "name": "Create OptionsAdapter (JSON, CSV, log formats)", "status": "COMPLETE" },
-        { "id": "A-003", "name": "Adapter unit tests", "status": "COMPLETE" }
+        { "id": "A-003", "name": "Adapter unit tests", "status": "COMPLETE" },
+        { "id": "A-004", "name": "Create NovaBotV2OptionsAdapter (real directory structure)", "status": "COMPLETE" },
+        { "id": "A-005", "name": "AdapterDiagnostics (files found/missing, skipped, mismatches)", "status": "COMPLETE" },
+        { "id": "A-006", "name": "Real data integration tests with fixtures", "status": "COMPLETE" },
+        { "id": "A-007", "name": "First real tacticbot_report.md generated", "status": "COMPLETE" },
+        { "id": "A-008", "name": "Write-safety verified (NovaBotV2Options unchanged)", "status": "COMPLETE" }
       ]
     },
     {

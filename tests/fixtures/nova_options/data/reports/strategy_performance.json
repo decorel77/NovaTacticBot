@@ -1,0 +1,31 @@
+{
+  "advisory_only": true,
+  "strategies": {
+    "LONG_CALL": {
+      "strategy_id": "LONG_CALL",
+      "trade_count": 2,
+      "win_count": 2,
+      "loss_count": 0,
+      "breakeven_count": 0,
+      "win_rate": 1.0,
+      "avg_pnl": 123.805,
+      "total_pnl": 247.61,
+      "best_pnl": 138.35,
+      "worst_pnl": 109.26,
+      "advisory_only": true
+    },
+    "CASH_SECURED_PUT": {
+      "strategy_id": "CASH_SECURED_PUT",
+      "trade_count": 1,
+      "win_count": 0,
+      "loss_count": 1,
+      "breakeven_count": 0,
+      "win_rate": 0.0,
+      "avg_pnl": -55.31,
+      "total_pnl": -55.31,
+      "best_pnl": -55.31,
+      "worst_pnl": -55.31,
+      "advisory_only": true
+    }
+  }
+}

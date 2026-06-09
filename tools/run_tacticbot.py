@@ -12,7 +12,14 @@ Workflow:
 READ-ONLY. No trades. No modifications. No broker access.
 
 Usage:
-    python tools/run_tacticbot.py [--source-dir PATH] [--report-dir PATH]
+    # Real NovaBotV2Options directory:
+    python tools/run_tacticbot.py --nova-options-dir C:/NovaGPT/Apps/NovaBotV2Options
+
+    # Generic source directory (JSON/CSV/log files):
+    python tools/run_tacticbot.py --source-dir PATH
+
+    # Both:
+    python tools/run_tacticbot.py --nova-options-dir PATH --source-dir PATH2
 """
 
 from __future__ import annotations
@@ -27,8 +34,9 @@ _PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
-from utils.guardrails import run_all_checks
+from utils.guardrails import run_all_checks, GuardrailViolation
 from adapters.options_adapter import OptionsAdapter
+from adapters.nova_options_adapter import NovaBotV2OptionsAdapter
 from core.tactic_analytics_engine import TacticAnalyticsEngine
 from core.tactic_event import TacticalEvent
 from utils.tactic_report_generator import TacticReportGenerator
@@ -45,9 +53,14 @@ def parse_args() -> argparse.Namespace:
         description="NovaTacticBot — read-only tactical intelligence runner"
     )
     parser.add_argument(
+        "--nova-options-dir",
+        default=None,
+        help="Root directory of NovaBotV2Options repository (reads data/logs/ and data/reports/)",
+    )
+    parser.add_argument(
         "--source-dir",
         default=None,
-        help="Directory containing NovaBotV2Options output files",
+        help="Generic source directory containing JSON/CSV/log files (OptionsAdapter)",
     )
     parser.add_argument(
         "--report-dir",
@@ -59,6 +72,17 @@ def parse_args() -> argparse.Namespace:
         default="tacticbot_report.md",
         help="Report file name",
     )
+    parser.add_argument(
+        "--warn-broker-env",
+        action="store_true",
+        default=False,
+        help=(
+            "DEVELOPMENT ONLY: log a WARNING instead of blocking when broker packages "
+            "are found in the environment. Use this when running on a developer machine "
+            "that also hosts NovaBotV2Options. NovaTacticBot itself still imports nothing "
+            "from broker packages. Do NOT use in production."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -69,6 +93,20 @@ def main() -> int:
     logger.info("=== NovaTacticBot starting — ADVISORY ONLY MODE ===")
     try:
         run_all_checks()
+    except GuardrailViolation as e:
+        if args.warn_broker_env:
+            logger.warning(
+                "DEVELOPMENT MODE: broker packages found in environment but continuing "
+                "because --warn-broker-env was specified. NovaTacticBot code imports "
+                "nothing from broker packages. Violation: %s", e
+            )
+        else:
+            logger.critical("Guardrail check failed: %s", e)
+            logger.critical(
+                "If running on a developer machine with other NOVA bots installed, "
+                "use --warn-broker-env to continue with a warning instead of blocking."
+            )
+            return 1
     except Exception as e:
         logger.critical("Guardrail check failed: %s", e)
         return 1
@@ -76,11 +114,40 @@ def main() -> int:
     # ── Step 2 & 3: Load adapters and events ───────────────────────────────────
     events: list[TacticalEvent] = []
     adapter_errors: list[str] = []
+    diagnostics = None
+    supplementary = None
 
-    options_adapter = OptionsAdapter(source_dir=args.source_dir)
-    options_events = options_adapter.load()
-    events.extend(options_events)
-    adapter_errors.extend(options_adapter.load_errors)
+    # Real NovaBotV2Options directory (preferred)
+    if args.nova_options_dir:
+        nova_adapter = NovaBotV2OptionsAdapter(source_dir=args.nova_options_dir)
+        nova_events = nova_adapter.load()
+        events.extend(nova_events)
+        adapter_errors.extend(nova_adapter.load_errors)
+        diagnostics = nova_adapter.diagnostics
+        supplementary = {
+            "strategy_performance": nova_adapter.strategy_performance,
+            "regime_performance": nova_adapter.regime_performance,
+        }
+        logger.info(
+            "NovaBotV2OptionsAdapter: %d events (diagnostics: %d skipped, %d errors)",
+            len(nova_events),
+            nova_adapter.diagnostics.records_skipped,
+            len(nova_adapter.diagnostics.parse_errors),
+        )
+
+    # Generic source directory (OptionsAdapter — JSON/CSV/log)
+    if args.source_dir:
+        options_adapter = OptionsAdapter(source_dir=args.source_dir)
+        options_events = options_adapter.load()
+        events.extend(options_events)
+        adapter_errors.extend(options_adapter.load_errors)
+        logger.info("OptionsAdapter: %d events", len(options_events))
+
+    if not args.nova_options_dir and not args.source_dir:
+        logger.warning(
+            "No source directory specified. Pass --nova-options-dir or --source-dir. "
+            "Generating empty report."
+        )
 
     logger.info("Total events loaded: %d", len(events))
     if adapter_errors:
@@ -100,7 +167,12 @@ def main() -> int:
     # ── Step 5: Report generation ──────────────────────────────────────────────
     report_path = Path(args.report_dir) / args.report_name
     generator = TacticReportGenerator()
-    written_path = generator.generate(result, output_path=report_path)
+    written_path = generator.generate(
+        result,
+        output_path=report_path,
+        diagnostics=diagnostics,
+        supplementary=supplementary,
+    )
     logger.info("Report written: %s", written_path)
 
     # ── Step 6: Summary ────────────────────────────────────────────────────────

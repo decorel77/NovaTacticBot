@@ -10,9 +10,12 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from core.tactic_analytics_engine import AnalyticsResult
+
+if TYPE_CHECKING:
+    from adapters.nova_options_adapter import AdapterDiagnostics
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +29,8 @@ class TacticReportGenerator:
         result: AnalyticsResult,
         output_path: Optional[Path] = None,
         source_description: str = "NovaBotV2Options",
+        diagnostics: "Optional[AdapterDiagnostics]" = None,
+        supplementary: "Optional[dict]" = None,
     ) -> Path:
         """
         Render the AnalyticsResult to markdown and write to output_path.
@@ -35,14 +40,20 @@ class TacticReportGenerator:
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
 
-        report = self._render(result, source_description)
+        report = self._render(result, source_description, diagnostics, supplementary)
         path.write_text(report, encoding="utf-8")
         logger.info("Report written to %s", path)
         return path
 
     # ── Rendering ──────────────────────────────────────────────────────────────
 
-    def _render(self, result: AnalyticsResult, source: str) -> str:
+    def _render(
+        self,
+        result: AnalyticsResult,
+        source: str,
+        diagnostics: "Optional[AdapterDiagnostics]" = None,
+        supplementary: "Optional[dict]" = None,
+    ) -> str:
         sections = [
             self._header(source),
             self._executive_summary(result),
@@ -51,6 +62,9 @@ class TacticReportGenerator:
             self._recommendation_quality(result),
             self._rejection_analysis(result),
             self._data_quality(result),
+            self._adapter_diagnostics(diagnostics),
+            self._supplementary_strategy_performance(supplementary),
+            self._supplementary_regime_performance(supplementary),
             self._open_questions(result),
             self._observations(result),
             self._footer(),
@@ -209,6 +223,89 @@ class TacticReportGenerator:
         lines = ["## Observations", ""]
         for obs in result.observations:
             lines.append(f"- {obs}")
+        return "\n".join(lines)
+
+    def _adapter_diagnostics(self, diagnostics: "Optional[AdapterDiagnostics]") -> str:
+        if diagnostics is None:
+            return ""
+        lines = [
+            "## Adapter Diagnostics",
+            "",
+            f"- **Source directory:** `{diagnostics.source_dir}`",
+            f"- **Events parsed:** {diagnostics.events_parsed}",
+            f"- **Records skipped:** {diagnostics.records_skipped}",
+        ]
+        if diagnostics.files_found:
+            lines += ["", "**Files found:**"]
+            for f in diagnostics.files_found:
+                lines.append(f"  - `{f}` ✓")
+        if diagnostics.files_missing:
+            lines += ["", "**Files missing:**"]
+            for f in diagnostics.files_missing:
+                lines.append(f"  - `{f}` ✗")
+        if diagnostics.source_breakdown:
+            lines += ["", "**Events by source:**"]
+            for src, cnt in sorted(diagnostics.source_breakdown.items()):
+                lines.append(f"  - {src}: {cnt}")
+        if diagnostics.schema_mismatches:
+            lines += ["", f"**Schema mismatches ({len(diagnostics.schema_mismatches)}):**"]
+            for m in diagnostics.schema_mismatches[:10]:
+                lines.append(f"  - {m}")
+            if len(diagnostics.schema_mismatches) > 10:
+                lines.append(f"  - … and {len(diagnostics.schema_mismatches) - 10} more")
+        if diagnostics.parse_errors:
+            lines += ["", f"**Parse errors ({len(diagnostics.parse_errors)}):**"]
+            for e in diagnostics.parse_errors[:5]:
+                lines.append(f"  - {e}")
+        return "\n".join(lines)
+
+    def _supplementary_strategy_performance(self, supplementary: "Optional[dict]") -> str:
+        if not supplementary:
+            return ""
+        strat = supplementary.get("strategy_performance", {}).get("strategies", {})
+        if not strat:
+            return ""
+        lines = [
+            "## NovaBotV2Options Strategy Performance (Pre-Computed)",
+            "",
+            "_Source: `data/reports/strategy_performance.json` — advisory only_",
+            "",
+            "| Strategy | Trades | Wins | Losses | Win Rate | Avg PnL | Total PnL |",
+            "|---|---|---|---|---|---|---|",
+        ]
+        for sid, s in strat.items():
+            wr = f"{s.get('win_rate', 0):.1%}"
+            avg_pnl = f"${s.get('avg_pnl', 0):+.2f}"
+            total_pnl = f"${s.get('total_pnl', 0):+.2f}"
+            lines.append(
+                f"| {sid} | {s.get('trade_count', 0)} | {s.get('win_count', 0)} "
+                f"| {s.get('loss_count', 0)} | {wr} | {avg_pnl} | {total_pnl} |"
+            )
+        return "\n".join(lines)
+
+    def _supplementary_regime_performance(self, supplementary: "Optional[dict]") -> str:
+        if not supplementary:
+            return ""
+        buckets = supplementary.get("regime_performance", {}).get("buckets", {})
+        if not buckets:
+            return ""
+        lines = [
+            "## NovaBotV2Options Regime Performance (Pre-Computed)",
+            "",
+            "_Source: `data/reports/regime_performance.json` — advisory only_",
+            "",
+            "| Regime | Vol Env | Signals | Trades | Win Rate | Avg PnL | Reject Rate |",
+            "|---|---|---|---|---|---|---|",
+        ]
+        for bucket_key, b in sorted(buckets.items()):
+            wr = f"{b.get('win_rate', 0):.1%}"
+            avg_pnl = f"${b.get('avg_pnl', 0):+.2f}"
+            reject_rate = f"{b.get('rejection_rate', 0):.0%}"
+            lines.append(
+                f"| {b.get('regime', '?')} | {b.get('vol_env', '?')} "
+                f"| {b.get('signals_created', 0)} | {b.get('trade_count', 0)} "
+                f"| {wr} | {avg_pnl} | {reject_rate} |"
+            )
         return "\n".join(lines)
 
     def _footer(self) -> str:

@@ -1,0 +1,62 @@
+{
+  "advisory_only": true,
+  "total_accepted": 3,
+  "accepted_with_outcome": 3,
+  "accepted_win_rate": 0.667,
+  "accepted_avg_pnl": 67.0,
+  "total_rejected": 2,
+  "recommendations": [
+    {
+      "signal_id": "sig-001-000",
+      "recommendation_id": "rec-001",
+      "symbol": "AAPL",
+      "strategy_id": "LONG_CALL",
+      "rank": 1,
+      "confidence": 0.82,
+      "estimated_rr": 2.0,
+      "was_accepted": true,
+      "was_rejected": false,
+      "outcome_pnl": 138.35,
+      "outcome_win": true,
+      "holding_period_days": 14.0,
+      "regime": "BULL",
+      "volatility_environment": "ELEVATED",
+      "advisory_only": true
+    },
+    {
+      "signal_id": "sig-001-001",
+      "recommendation_id": "rec-002",
+      "symbol": "SPY",
+      "strategy_id": "CASH_SECURED_PUT",
+      "rank": 2,
+      "confidence": 0.53,
+      "estimated_rr": 2.0,
+      "was_accepted": true,
+      "was_rejected": false,
+      "outcome_pnl": -55.31,
+      "outcome_win": false,
+      "holding_period_days": 10.0,
+      "regime": "BEAR",
+      "volatility_environment": "NORMAL",
+      "advisory_only": true
+    },
+    {
+      "signal_id": "sig-001-003",
+      "recommendation_id": "rec-004",
+      "symbol": "TSLA",
+      "strategy_id": "LONG_CALL",
+      "rank": 1,
+      "confidence": 0.89,
+      "estimated_rr": 2.0,
+      "was_accepted": true,
+      "was_rejected": false,
+      "outcome_pnl": 109.26,
+      "outcome_win": true,
+      "holding_period_days": 7.0,
+      "regime": "BULL",
+      "volatility_environment": "HIGH_IV",
+      "advisory_only": true
+    }
+  ],
+  "rejected_signals": []
+}

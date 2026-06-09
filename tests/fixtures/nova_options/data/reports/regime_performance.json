@@ -1,0 +1,50 @@
+{
+  "advisory_only": true,
+  "buckets": {
+    "BULL|ELEVATED": {
+      "regime": "BULL",
+      "vol_env": "ELEVATED",
+      "signals_created": 2,
+      "signals_rejected": 0,
+      "signals_recommended": 2,
+      "rejection_rate": 0.0,
+      "trade_count": 2,
+      "win_count": 2,
+      "win_rate": 1.0,
+      "avg_pnl": 123.805,
+      "total_pnl": 247.61,
+      "recommendation_quality": 1.0,
+      "risk_breaches": 0
+    },
+    "BEAR|NORMAL": {
+      "regime": "BEAR",
+      "vol_env": "NORMAL",
+      "signals_created": 2,
+      "signals_rejected": 1,
+      "signals_recommended": 1,
+      "rejection_rate": 0.5,
+      "trade_count": 1,
+      "win_count": 0,
+      "win_rate": 0.0,
+      "avg_pnl": -55.31,
+      "total_pnl": -55.31,
+      "recommendation_quality": 0.5,
+      "risk_breaches": 0
+    },
+    "SIDEWAYS|NORMAL": {
+      "regime": "SIDEWAYS",
+      "vol_env": "NORMAL",
+      "signals_created": 1,
+      "signals_rejected": 1,
+      "signals_recommended": 0,
+      "rejection_rate": 1.0,
+      "trade_count": 0,
+      "win_count": 0,
+      "win_rate": 0.0,
+      "avg_pnl": 0.0,
+      "total_pnl": 0.0,
+      "recommendation_quality": 0.0,
+      "risk_breaches": 0
+    }
+  }
+}
