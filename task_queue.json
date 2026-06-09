@@ -1,0 +1,108 @@
+{
+  "bot": "NovaTacticBot",
+  "version": "1.0",
+  "last_updated": "2026-06-09",
+  "phases": [
+    {
+      "phase_id": "FOUNDATION",
+      "name": "Foundation",
+      "status": "COMPLETE",
+      "description": "Repository skeleton, data contract, guardrails, architecture documentation",
+      "tasks": [
+        { "id": "F-001", "name": "Create repository structure", "status": "COMPLETE" },
+        { "id": "F-002", "name": "Define tactic_data_contract.md", "status": "COMPLETE" },
+        { "id": "F-003", "name": "Define tacticbot_guardrails.md", "status": "COMPLETE" },
+        { "id": "F-004", "name": "Define vision.md", "status": "COMPLETE" },
+        { "id": "F-005", "name": "Create TacticalEvent dataclass", "status": "COMPLETE" },
+        { "id": "F-006", "name": "Create guardrails enforcement module", "status": "COMPLETE" }
+      ]
+    },
+    {
+      "phase_id": "ADAPTER_LAYER",
+      "name": "Adapter Layer",
+      "status": "COMPLETE",
+      "description": "Base adapter interface and NovaBotV2Options adapter",
+      "tasks": [
+        { "id": "A-001", "name": "Create BaseAdapter abstract class", "status": "COMPLETE" },
+        { "id": "A-002", "name": "Create OptionsAdapter (JSON, CSV, log formats)", "status": "COMPLETE" },
+        { "id": "A-003", "name": "Adapter unit tests", "status": "COMPLETE" }
+      ]
+    },
+    {
+      "phase_id": "TACTICAL_ANALYTICS",
+      "name": "Tactical Analytics",
+      "status": "COMPLETE",
+      "description": "Analytics engine and report generator",
+      "tasks": [
+        { "id": "T-001", "name": "Create TacticAnalyticsEngine", "status": "COMPLETE" },
+        { "id": "T-002", "name": "Strategy comparison pass", "status": "COMPLETE" },
+        { "id": "T-003", "name": "Regime analysis pass", "status": "COMPLETE" },
+        { "id": "T-004", "name": "Rejection analysis pass", "status": "COMPLETE" },
+        { "id": "T-005", "name": "Recommendation quality pass", "status": "COMPLETE" },
+        { "id": "T-006", "name": "Create TacticReportGenerator", "status": "COMPLETE" },
+        { "id": "T-007", "name": "Analytics engine unit tests", "status": "COMPLETE" },
+        { "id": "T-008", "name": "Report generator unit tests", "status": "COMPLETE" },
+        { "id": "T-009", "name": "Read-only behavior tests", "status": "COMPLETE" }
+      ]
+    },
+    {
+      "phase_id": "MULTI_BOT_SUPPORT",
+      "name": "Multi-Bot Support",
+      "status": "PLANNED",
+      "description": "Adapters for NovaBotV2, MarketRegimeBot, NovaAllocationBot, NovaBridge",
+      "tasks": [
+        { "id": "MB-001", "name": "Create NovaBotV2Adapter", "status": "PLANNED" },
+        { "id": "MB-002", "name": "Create MarketRegimeBotAdapter", "status": "PLANNED" },
+        { "id": "MB-003", "name": "Create NovaAllocationBotAdapter", "status": "PLANNED" },
+        { "id": "MB-004", "name": "Create NovaBridgeAdapter", "status": "PLANNED" },
+        { "id": "MB-005", "name": "Cross-bot correlation analysis", "status": "PLANNED" }
+      ]
+    },
+    {
+      "phase_id": "BIAS_DETECTION",
+      "name": "Bias Detection",
+      "status": "PLANNED",
+      "description": "Detect systematic biases in bot decision-making",
+      "tasks": [
+        { "id": "BD-001", "name": "Regime bias detector", "status": "PLANNED" },
+        { "id": "BD-002", "name": "Score calibration bias detector", "status": "PLANNED" },
+        { "id": "BD-003", "name": "Time-of-day / day-of-week bias analysis", "status": "PLANNED" },
+        { "id": "BD-004", "name": "Streak detection (win/loss run analysis)", "status": "PLANNED" }
+      ]
+    },
+    {
+      "phase_id": "TACTICAL_SUGGESTIONS",
+      "name": "Tactical Suggestions",
+      "status": "PLANNED",
+      "description": "Advisory suggestions section added to reports (human-review required)",
+      "tasks": [
+        { "id": "TS-001", "name": "Define suggestion schema", "status": "PLANNED" },
+        { "id": "TS-002", "name": "Strategy scaling suggestions (advisory only)", "status": "PLANNED" },
+        { "id": "TS-003", "name": "Regime-strategy fit suggestions", "status": "PLANNED" },
+        { "id": "TS-004", "name": "Human approval workflow documentation", "status": "PLANNED" }
+      ]
+    },
+    {
+      "phase_id": "PHASE_2",
+      "name": "Phase 2 — Edge Erosion Detection",
+      "status": "FUTURE",
+      "description": "Longitudinal tracking to detect when a strategy's edge is diminishing",
+      "tasks": [
+        { "id": "P2-001", "name": "Rolling window win-rate tracker", "status": "FUTURE" },
+        { "id": "P2-002", "name": "Edge erosion alert (advisory, report only)", "status": "FUTURE" },
+        { "id": "P2-003", "name": "Historical baseline storage in data/system/", "status": "FUTURE" }
+      ]
+    },
+    {
+      "phase_id": "PHASE_3",
+      "name": "Phase 3 — Weekly Intelligence Briefings",
+      "status": "FUTURE",
+      "description": "Automated weekly report generation covering all active NOVA bots",
+      "tasks": [
+        { "id": "P3-001", "name": "Scheduled weekly report runner", "status": "FUTURE" },
+        { "id": "P3-002", "name": "Multi-bot executive briefing template", "status": "FUTURE" },
+        { "id": "P3-003", "name": "NovaMemoryBot integration for historical context", "status": "FUTURE" }
+      ]
+    }
+  ]
+}
