@@ -290,7 +290,7 @@
     "title": "Multi-source data merge and deduplication",
     "phase": "PHASE_2",
     "phase_name": "Data Collection",
-    "status": "TODO",
+    "status": "DONE",
     "priority": "P1",
     "risk": "LOW",
     "task_type": "data_collection",
