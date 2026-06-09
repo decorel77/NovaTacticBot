@@ -1,7 +1,7 @@
 # NovaTacticBot — Current State
 
 **Date:** 2026-06-09  
-**Phase:** Phase 2 — Real Data Integration — COMPLETE | Task Queue Architecture Cycle — COMPLETE  
+**Phase:** Phase 2 — Real Data Integration — COMPLETE | Task Queue Architecture Cycle — COMPLETE | TACTIC-EL-001 DONE  
 **Mode:** ADVISORY_ONLY = True  
 
 ---
@@ -32,6 +32,7 @@
 ### Utils
 - `utils/guardrails.py` — startup checks, `ADVISORY_ONLY = True`
 - `utils/tactic_report_generator.py` — renders AnalyticsResult → markdown + diagnostics
+- `utils/tactic_event_logger.py` — **NEW** internal event log schema + JSONL writer (TACTIC-EL-001)
 
 ### Tools
 - `tools/run_tacticbot.py` — CLI runner
