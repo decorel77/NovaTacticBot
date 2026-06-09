@@ -24,7 +24,7 @@
     "priority": "P0",
     "risk": "LOW",
     "task_type": "foundation",
-    "summary": "Document the universal TacticalEvent data contract v1.0 \u00e2\u20ac\u201d the canonical schema for all events ingested by TacticBot.",
+    "summary": "Document the universal TacticalEvent data contract v1.0 â€” the canonical schema for all events ingested by TacticBot.",
     "dependencies": [
       "TACTIC-F-001"
     ],
@@ -53,7 +53,7 @@
   },
   {
     "id": "TACTIC-F-004",
-    "title": "Define vision.md \u00e2\u20ac\u201d why TacticBot exists",
+    "title": "Define vision.md â€” why TacticBot exists",
     "phase": "PHASE_1",
     "phase_name": "Foundation",
     "status": "DONE",
@@ -179,7 +179,7 @@
   },
   {
     "id": "TACTIC-DC-003",
-    "title": "Implement AdapterDiagnostics \u00e2\u20ac\u201d files found/missing/skipped/errors",
+    "title": "Implement AdapterDiagnostics â€” files found/missing/skipped/errors",
     "phase": "PHASE_2",
     "phase_name": "Data Collection",
     "status": "DONE",
@@ -218,7 +218,7 @@
     "title": "Create MarketRegimeBot adapter",
     "phase": "PHASE_2",
     "phase_name": "Data Collection",
-    "status": "TODO",
+    "status": "DONE",
     "priority": "P1",
     "risk": "LOW",
     "task_type": "data_collection",
@@ -229,7 +229,13 @@
     "allowed_under_current_architecture": true,
     "runtime_effect": false,
     "broker_execution": false,
-    "live_trading_readiness": "not_applicable"
+    "live_trading_readiness": "not_applicable",
+    "completed": "2026-06-09",
+    "deliverables": [
+      "adapters/market_regime_adapter.py",
+      "tests/test_market_regime_adapter.py",
+      "utils/multi_source_merger.py (wired MarketRegimeBotAdapter)"
+    ]
   },
   {
     "id": "TACTIC-DC-006",
@@ -306,7 +312,7 @@
   },
   {
     "id": "TACTIC-DC-010",
-    "title": "Source inventory v2 \u00e2\u20ac\u201d multi-bot schema documentation",
+    "title": "Source inventory v2 â€” multi-bot schema documentation",
     "phase": "PHASE_2",
     "phase_name": "Data Collection",
     "status": "TODO",
@@ -432,7 +438,7 @@
   },
   {
     "id": "TACTIC-HA-001",
-    "title": "Analytics Engine v1 \u00e2\u20ac\u201d strategy, regime, rejection, recommendation quality",
+    "title": "Analytics Engine v1 â€” strategy, regime, rejection, recommendation quality",
     "phase": "PHASE_4",
     "phase_name": "Historical Analytics",
     "status": "DONE",
@@ -450,7 +456,7 @@
   },
   {
     "id": "TACTIC-HA-002",
-    "title": "Analytics Engine v2 \u00e2\u20ac\u201d symbol concentration, confidence distribution, candidate ranking",
+    "title": "Analytics Engine v2 â€” symbol concentration, confidence distribution, candidate ranking",
     "phase": "PHASE_4",
     "phase_name": "Historical Analytics",
     "status": "DONE",
@@ -583,7 +589,7 @@
     "priority": "P1",
     "risk": "LOW",
     "task_type": "analytics",
-    "summary": "Rank strategies by composite score (win rate \u00c3\u2014 avg PnL normalized). Surface top-N and bottom-N strategies in report.",
+    "summary": "Rank strategies by composite score (win rate Ã— avg PnL normalized). Surface top-N and bottom-N strategies in report.",
     "dependencies": [
       "TACTIC-SA-001"
     ],
@@ -601,7 +607,7 @@
     "priority": "P1",
     "risk": "LOW",
     "task_type": "analytics",
-    "summary": "Detect consecutive win and loss streaks per strategy. Flag strategies with loss streaks \u00e2\u2030\u00a53. Include streak analysis section in report.",
+    "summary": "Detect consecutive win and loss streaks per strategy. Flag strategies with loss streaks â‰¥3. Include streak analysis section in report.",
     "dependencies": [
       "TACTIC-SA-001"
     ],
@@ -637,7 +643,7 @@
     "priority": "P1",
     "risk": "LOW",
     "task_type": "analytics",
-    "summary": "Compare rolling win rate to long-term baseline per strategy. Flag when current rolling rate is \u00e2\u2030\u00a510 percentage points below baseline. Alert in report as EDGE_EROSION_WARNING.",
+    "summary": "Compare rolling win rate to long-term baseline per strategy. Flag when current rolling rate is â‰¥10 percentage points below baseline. Alert in report as EDGE_EROSION_WARNING.",
     "dependencies": [
       "TACTIC-HA-003",
       "TACTIC-SA-001"
@@ -685,7 +691,7 @@
   },
   {
     "id": "TACTIC-SA-008",
-    "title": "Strategy test suite \u00e2\u20ac\u201d v3 analytics",
+    "title": "Strategy test suite â€” v3 analytics",
     "phase": "PHASE_5",
     "phase_name": "Strategy Analytics",
     "status": "TODO",
@@ -902,7 +908,7 @@
   },
   {
     "id": "TACTIC-CBA-001",
-    "title": "Cross-bot correlation analysis \u00e2\u20ac\u201d NovaBotV2 vs NovaBotV2Options",
+    "title": "Cross-bot correlation analysis â€” NovaBotV2 vs NovaBotV2Options",
     "phase": "PHASE_8",
     "phase_name": "Cross-Bot Analytics",
     "status": "TODO",
@@ -1188,7 +1194,7 @@
     "priority": "P3",
     "risk": "LOW",
     "task_type": "reporting",
-    "summary": "Create a scheduled runner for weekly report generation. Runs the full analytics pipeline and generates all reports. No Telegram delivery \u00e2\u20ac\u201d report output to data/reports/ only.",
+    "summary": "Create a scheduled runner for weekly report generation. Runs the full analytics pipeline and generates all reports. No Telegram delivery â€” report output to data/reports/ only.",
     "dependencies": [
       "TACTIC-RP-003"
     ],
@@ -1298,7 +1304,7 @@
     "priority": "P2",
     "risk": "LOW",
     "task_type": "analytics",
-    "summary": "Based on strategy rankings and regime fit, produce an advisory allocation suggestion (e.g., favour covered calls in BULL regime). Output to data/reports/ as advisory text. No execution \u00e2\u20ac\u201d human review required.",
+    "summary": "Based on strategy rankings and regime fit, produce an advisory allocation suggestion (e.g., favour covered calls in BULL regime). Output to data/reports/ as advisory text. No execution â€” human review required.",
     "dependencies": [
       "TACTIC-AI-001",
       "TACTIC-RA-003"
@@ -1317,7 +1323,7 @@
     "priority": "P2",
     "risk": "LOW",
     "task_type": "integration",
-    "summary": "Include tactic_allocation_advisory field in TacticBot result_snapshot.json. AllocationBot can read this field as one advisory input among several. Advisory only \u00e2\u20ac\u201d no execution.",
+    "summary": "Include tactic_allocation_advisory field in TacticBot result_snapshot.json. AllocationBot can read this field as one advisory input among several. Advisory only â€” no execution.",
     "dependencies": [
       "TACTIC-AI-002",
       "TACTIC-RP-005"
@@ -1336,7 +1342,7 @@
     "priority": "P3",
     "risk": "LOW",
     "task_type": "analytics",
-    "summary": "FUTURE \u00e2\u20ac\u201d Read AllocationBot allocation history to assess whether TacticBot-informed allocation periods show better outcomes than non-TacticBot-informed periods. Requires substantial data accumulation.",
+    "summary": "FUTURE â€” Read AllocationBot allocation history to assess whether TacticBot-informed allocation periods show better outcomes than non-TacticBot-informed periods. Requires substantial data accumulation.",
     "dependencies": [
       "TACTIC-AI-003"
     ],
@@ -1354,7 +1360,7 @@
     "priority": "P3",
     "risk": "LOW",
     "task_type": "analytics",
-    "summary": "FUTURE \u00e2\u20ac\u201d Apply chi-squared or bootstrap significance tests to strategy win rate differences. Flag which rankings are statistically significant vs noise. Requires N\u00e2\u2030\u00a530 trades per strategy.",
+    "summary": "FUTURE â€” Apply chi-squared or bootstrap significance tests to strategy win rate differences. Flag which rankings are statistically significant vs noise. Requires Nâ‰¥30 trades per strategy.",
     "dependencies": [
       "TACTIC-SA-001"
     ],
@@ -1372,7 +1378,7 @@
     "priority": "P3",
     "risk": "LOW",
     "task_type": "analytics",
-    "summary": "FUTURE \u00e2\u20ac\u201d Compute a Sharpe-like ratio (mean PnL / std PnL) for each strategy. Rank by risk-adjusted return rather than raw win rate.",
+    "summary": "FUTURE â€” Compute a Sharpe-like ratio (mean PnL / std PnL) for each strategy. Rank by risk-adjusted return rather than raw win rate.",
     "dependencies": [
       "TACTIC-HA-006"
     ],
@@ -1390,7 +1396,7 @@
     "priority": "P3",
     "risk": "LOW",
     "task_type": "analytics",
-    "summary": "FUTURE \u00e2\u20ac\u201d Run Monte Carlo resampling on historical trade outcomes to estimate strategy robustness and probability of drawdown scenarios.",
+    "summary": "FUTURE â€” Run Monte Carlo resampling on historical trade outcomes to estimate strategy robustness and probability of drawdown scenarios.",
     "dependencies": [
       "TACTIC-AA-001"
     ],
@@ -1408,7 +1414,7 @@
     "priority": "P3",
     "risk": "LOW",
     "task_type": "analytics",
-    "summary": "FUTURE \u00e2\u20ac\u201d Build a correlation matrix of P/L outcomes across strategy-symbol pairs. Detect diversification quality and concentration risk.",
+    "summary": "FUTURE â€” Build a correlation matrix of P/L outcomes across strategy-symbol pairs. Detect diversification quality and concentration risk.",
     "dependencies": [
       "TACTIC-SA-006"
     ],
@@ -1426,7 +1432,7 @@
     "priority": "P3",
     "risk": "LOW",
     "task_type": "analytics",
-    "summary": "FUTURE \u00e2\u20ac\u201d Experimental: train a lightweight classifier (logistic regression or decision tree) on historical signal features to predict likely outcome. Advisory output only \u00e2\u20ac\u201d no execution. Requires N\u00e2\u2030\u00a5100 labelled outcomes.",
+    "summary": "FUTURE â€” Experimental: train a lightweight classifier (logistic regression or decision tree) on historical signal features to predict likely outcome. Advisory output only â€” no execution. Requires Nâ‰¥100 labelled outcomes.",
     "dependencies": [
       "TACTIC-AA-003"
     ],
@@ -1444,7 +1450,7 @@
     "priority": "P3",
     "risk": "LOW",
     "task_type": "reporting",
-    "summary": "FUTURE \u00e2\u20ac\u201d Generate a unified multi-bot executive briefing combining TacticBot analytics, NovaMemoryBot history, and NovaBridge ecosystem state into a single weekly report.",
+    "summary": "FUTURE â€” Generate a unified multi-bot executive briefing combining TacticBot analytics, NovaMemoryBot history, and NovaBridge ecosystem state into a single weekly report.",
     "dependencies": [
       "TACTIC-RP-003",
       "TACTIC-MI-004"
@@ -1456,14 +1462,14 @@
   },
   {
     "id": "TACTIC-RR-001",
-    "title": "Phase readiness gate review \u00e2\u20ac\u201d multi-bot adapters",
+    "title": "Phase readiness gate review â€” multi-bot adapters",
     "phase": "PHASE_14",
     "phase_name": "Readiness Review",
     "status": "FUTURE",
     "priority": "P1",
     "risk": "LOW",
     "task_type": "audit",
-    "summary": "FUTURE \u00e2\u20ac\u201d Human review gate: verify all multi-bot adapters (NovaBotV2, MarketRegimeBot, AllocationBot, MemoryBot, NovaBridge) are complete and tests passing before advancing to cross-bot analytics.",
+    "summary": "FUTURE â€” Human review gate: verify all multi-bot adapters (NovaBotV2, MarketRegimeBot, AllocationBot, MemoryBot, NovaBridge) are complete and tests passing before advancing to cross-bot analytics.",
     "dependencies": [
       "TACTIC-DC-009"
     ],
@@ -1474,14 +1480,14 @@
   },
   {
     "id": "TACTIC-RR-002",
-    "title": "Phase readiness gate review \u00e2\u20ac\u201d analytics engines",
+    "title": "Phase readiness gate review â€” analytics engines",
     "phase": "PHASE_14",
     "phase_name": "Readiness Review",
     "status": "FUTURE",
     "priority": "P1",
     "risk": "LOW",
     "task_type": "audit",
-    "summary": "FUTURE \u00e2\u20ac\u201d Human review gate: verify all analytics engines (PHASE_4\u00e2\u20ac\u201cPHASE_8) complete, test suite passing, baselines stored, edge erosion detection operational.",
+    "summary": "FUTURE â€” Human review gate: verify all analytics engines (PHASE_4â€“PHASE_8) complete, test suite passing, baselines stored, edge erosion detection operational.",
     "dependencies": [
       "TACTIC-CBA-004",
       "TACTIC-SA-008",
@@ -1494,14 +1500,14 @@
   },
   {
     "id": "TACTIC-RR-003",
-    "title": "Phase readiness gate review \u00e2\u20ac\u201d reporting and dashboard",
+    "title": "Phase readiness gate review â€” reporting and dashboard",
     "phase": "PHASE_14",
     "phase_name": "Readiness Review",
     "status": "FUTURE",
     "priority": "P1",
     "risk": "LOW",
     "task_type": "audit",
-    "summary": "FUTURE \u00e2\u20ac\u201d Human review gate: verify all reports (Markdown, HTML, JSON export, result_snapshot) are generated correctly and contain actionable insights.",
+    "summary": "FUTURE â€” Human review gate: verify all reports (Markdown, HTML, JSON export, result_snapshot) are generated correctly and contain actionable insights.",
     "dependencies": [
       "TACTIC-DB-005",
       "TACTIC-RP-005"
@@ -1520,7 +1526,7 @@
     "priority": "P0",
     "risk": "LOW",
     "task_type": "audit",
-    "summary": "FUTURE \u00e2\u20ac\u201d Final audit: verify ADVISORY_ONLY=True is enforced at all entry points, no broker imports present in any module, no execution path accessible, write operations limited to data/ directory only.",
+    "summary": "FUTURE â€” Final audit: verify ADVISORY_ONLY=True is enforced at all entry points, no broker imports present in any module, no execution path accessible, write operations limited to data/ directory only.",
     "dependencies": [
       "TACTIC-RR-003"
     ],
@@ -1531,14 +1537,14 @@
   },
   {
     "id": "TACTIC-RR-005",
-    "title": "Full test suite health check \u00e2\u20ac\u201d target 200+ tests",
+    "title": "Full test suite health check â€” target 200+ tests",
     "phase": "PHASE_14",
     "phase_name": "Readiness Review",
     "status": "FUTURE",
     "priority": "P1",
     "risk": "LOW",
     "task_type": "audit",
-    "summary": "FUTURE \u00e2\u20ac\u201d Verify test suite covers all adapters, analytics engines, dashboard generators, logging, and cross-bot scenarios. Target 200+ tests, 0 failures.",
+    "summary": "FUTURE â€” Verify test suite covers all adapters, analytics engines, dashboard generators, logging, and cross-bot scenarios. Target 200+ tests, 0 failures.",
     "dependencies": [
       "TACTIC-RR-004"
     ],
@@ -1556,7 +1562,7 @@
     "priority": "P3",
     "risk": "LOW",
     "task_type": "planning",
-    "summary": "PLANNING ONLY \u00e2\u20ac\u201d Document how a future LoggingBot would provide centralized structured logs to TacticBot. No implementation.",
+    "summary": "PLANNING ONLY â€” Document how a future LoggingBot would provide centralized structured logs to TacticBot. No implementation.",
     "dependencies": [],
     "allowed_under_current_architecture": false,
     "runtime_effect": false,
@@ -1572,7 +1578,7 @@
     "priority": "P3",
     "risk": "LOW",
     "task_type": "planning",
-    "summary": "PLANNING ONLY \u00e2\u20ac\u201d Document how a future ResearchBot providing fundamental/earnings data could enrich TacticBot signal analysis. No implementation.",
+    "summary": "PLANNING ONLY â€” Document how a future ResearchBot providing fundamental/earnings data could enrich TacticBot signal analysis. No implementation.",
     "dependencies": [],
     "allowed_under_current_architecture": false,
     "runtime_effect": false,
@@ -1588,7 +1594,7 @@
     "priority": "P3",
     "risk": "LOW",
     "task_type": "planning",
-    "summary": "PLANNING ONLY \u00e2\u20ac\u201d Document how a future NewsBot providing news sentiment scores could be correlated with signal quality and regime changes in TacticBot analysis. No implementation.",
+    "summary": "PLANNING ONLY â€” Document how a future NewsBot providing news sentiment scores could be correlated with signal quality and regime changes in TacticBot analysis. No implementation.",
     "dependencies": [],
     "allowed_under_current_architecture": false,
     "runtime_effect": false,
@@ -1604,7 +1610,7 @@
     "priority": "P3",
     "risk": "LOW",
     "task_type": "planning",
-    "summary": "PLANNING ONLY \u00e2\u20ac\u201d Document how a future MacroBot providing macro-economic regime signals (yield curve, inflation, Fed policy) could layer into TacticBot regime analytics. No implementation.",
+    "summary": "PLANNING ONLY â€” Document how a future MacroBot providing macro-economic regime signals (yield curve, inflation, Fed policy) could layer into TacticBot regime analytics. No implementation.",
     "dependencies": [],
     "allowed_under_current_architecture": false,
     "runtime_effect": false,
@@ -1620,7 +1626,7 @@
     "priority": "P3",
     "risk": "LOW",
     "task_type": "planning",
-    "summary": "PLANNING ONLY \u00e2\u20ac\u201d Document how a future TaxBot providing tax-adjusted P/L data could refine TacticBot strategy ranking to account for after-tax performance. No implementation.",
+    "summary": "PLANNING ONLY â€” Document how a future TaxBot providing tax-adjusted P/L data could refine TacticBot strategy ranking to account for after-tax performance. No implementation.",
     "dependencies": [],
     "allowed_under_current_architecture": false,
     "runtime_effect": false,
@@ -1672,7 +1678,7 @@
     "priority": "P2",
     "risk": "LOW",
     "task_type": "analytics",
-    "summary": "For each strategy, compute win rates conditioned on regime. Output as a regime \u00c3\u2014 strategy matrix table in reports. Enables targeted strategy selection per market condition.",
+    "summary": "For each strategy, compute win rates conditioned on regime. Output as a regime Ã— strategy matrix table in reports. Enables targeted strategy selection per market condition.",
     "dependencies": [
       "TACTIC-SA-001",
       "TACTIC-RA-001"
@@ -1728,7 +1734,7 @@
     "priority": "P0",
     "risk": "LOW",
     "task_type": "validation",
-    "summary": "Extend test_readonly_behavior.py to cover all Phase 2\u00e2\u20ac\u201c9 additions. Verify no writes occur to source bot directories, no broker imports are introduced, and ADVISORY_ONLY is not bypassed.",
+    "summary": "Extend test_readonly_behavior.py to cover all Phase 2â€“9 additions. Verify no writes occur to source bot directories, no broker imports are introduced, and ADVISORY_ONLY is not bypassed.",
     "dependencies": [
       "TACTIC-DB-003"
     ],
@@ -1793,14 +1799,14 @@
   },
   {
     "id": "TACTIC-RR-006",
-    "title": "Ecosystem integration documentation \u00e2\u20ac\u201d final handover",
+    "title": "Ecosystem integration documentation â€” final handover",
     "phase": "PHASE_14",
     "phase_name": "Readiness Review",
     "status": "FUTURE",
     "priority": "P1",
     "risk": "LOW",
     "task_type": "documentation",
-    "summary": "FUTURE \u00e2\u20ac\u201d Produce final handover documentation summarizing TacticBot's full architecture, data sources, analytics coverage, known gaps, and recommended next development cycle.",
+    "summary": "FUTURE â€” Produce final handover documentation summarizing TacticBot's full architecture, data sources, analytics coverage, known gaps, and recommended next development cycle.",
     "dependencies": [
       "TACTIC-RR-005"
     ],

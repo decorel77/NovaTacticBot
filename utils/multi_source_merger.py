@@ -8,6 +8,7 @@ merge statistics.
 Registered adapters (loaded in priority order):
   1. NovaBotV2Options  — nova_options_adapter.NovaBotV2OptionsAdapter
   2. NovaBotV2         — nova_botv2_adapter.NovaBotV2Adapter
+  3. MarketRegimeBot   — market_regime_adapter.MarketRegimeBotAdapter
 
 Schema mismatches between adapters are handled gracefully: an event that
 fails validation is logged and counted but not included in the merged stream.
@@ -92,6 +93,13 @@ class MultiSourceMerger:
             adapters.append(NovaBotV2Adapter(src) if src else NovaBotV2Adapter())
         except Exception as exc:
             logger.warning("Could not instantiate NovaBotV2Adapter: %s", exc)
+
+        try:
+            from adapters.market_regime_adapter import MarketRegimeBotAdapter
+            src = self._source_dirs.get("MarketRegimeBot")
+            adapters.append(MarketRegimeBotAdapter(src) if src else MarketRegimeBotAdapter())
+        except Exception as exc:
+            logger.warning("Could not instantiate MarketRegimeBotAdapter: %s", exc)
 
         return adapters
 
