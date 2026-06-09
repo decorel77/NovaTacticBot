@@ -1,7 +1,7 @@
 # NovaTacticBot — Current State
 
 **Date:** 2026-06-09  
-**Phase:** Phases 3–6 COMPLETE + Phase 10 result_snapshot + Phase 11 HTML Dashboard  
+**Phase:** Phases 3–6 COMPLETE + Phase 10 result_snapshot + Phase 11 HTML Dashboard + MarketRegimeBot adapter  
 **Mode:** ADVISORY_ONLY = True  
 
 ---
@@ -31,6 +31,10 @@
 - `adapters/options_adapter.py` — generic JSON/CSV/log adapter
 - `adapters/nova_options_adapter.py` — real NovaBotV2Options directory adapter
 - `adapters/nova_botv2_adapter.py` — NovaBotV2 result_snapshot adapter → SYSTEM_EVENT per run (TACTIC-DC-004)
+- `adapters/market_regime_adapter.py` — MarketRegimeBot regime_export.json adapter → REGIME_CHANGE per run (TACTIC-DC-005 / MASTER-020)
+  - Reads regime_export.json (v1) or falls back to result_snapshot.json
+  - Maps market_regime → TacticalEvent.regime, confidence/100 → score
+  - Allowlist enforced, size guard, fail closed
   - Parses: `decision_audit_trail.jsonl`, `options_events.jsonl`, `recommendation_accuracy.json`
   - Supplementary: `strategy_performance.json`, `regime_performance.json`, `signal_lifecycle_summary.json`
   - Full `AdapterDiagnostics`
@@ -56,7 +60,7 @@
 ### Task Queue
 - `data/system/task_queue.json` — 100 tasks across 15 phases (NOVA standard format)
 
-### Tests (243 passing)
+### Tests (270 passing)
 - `tests/test_tactic_event.py`
 - `tests/test_options_adapter.py`
 - `tests/test_analytics_engine.py`
@@ -79,6 +83,7 @@
 - `tests/test_cross_run_trend_analyser.py` — NEW (21 tests)
 - `tests/test_nova_botv2_adapter.py` — NEW (21 tests)
 - `tests/test_multi_source_merger.py` — NEW (17 tests)
+- `tests/test_market_regime_adapter.py` — NEW (27 tests)
 
 ### Reports Generated
 - `data/reports/tacticbot_report.md`
@@ -117,8 +122,7 @@ python tools/run_tacticbot.py --nova-options-dir "C:\NovaGPT\Apps\NovaBotV2Optio
 
 ## What Is NOT Yet Built
 
-- NovaBotV2 adapter (TACTIC-DC-004) — requires schema coordination (human approval)
-- MarketRegimeBot adapter (TACTIC-DC-005) — blocked on MASTER-017
+- MarketRegimeBot adapter (TACTIC-DC-005) — **DONE** (MASTER-020)
 - NovaAllocationBot adapter (TACTIC-DC-006)
 - NovaMemoryBot adapter (TACTIC-DC-007)
 - NovaBridge adapter (TACTIC-DC-008)
