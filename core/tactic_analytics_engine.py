@@ -171,6 +171,26 @@ class CandidateRanking:
 
 
 @dataclass
+class StrategyStreakStats:
+    strategy_id: str
+    current_streak: int = 0           # positive = win streak, negative = loss streak
+    max_win_streak: int = 0
+    max_loss_streak: int = 0
+    current_loss_streak: int = 0      # convenience: absolute value of current streak if losing
+    flagged: bool = False             # True when current loss streak >= LOSS_STREAK_FLAG_THRESHOLD
+
+
+LOSS_STREAK_FLAG_THRESHOLD = 3
+
+
+@dataclass
+class StreakAnalysis:
+    """Consecutive win/loss streak data per strategy."""
+    by_strategy: dict[str, StrategyStreakStats] = field(default_factory=dict)
+    flagged_strategies: list[str] = field(default_factory=list)
+
+
+@dataclass
 class AnalyticsResult:
     strategy_stats: dict[str, StrategyStats] = field(default_factory=dict)
     regime_stats: dict[str, RegimeStats] = field(default_factory=dict)
@@ -181,6 +201,7 @@ class AnalyticsResult:
     confidence_distribution: ConfidenceDistribution = field(default_factory=ConfidenceDistribution)
     candidate_ranking: CandidateRanking = field(default_factory=CandidateRanking)
     rolling_win_rates: RollingWinRates = field(default_factory=RollingWinRates)
+    streak_analysis: StreakAnalysis = field(default_factory=StreakAnalysis)
     open_questions: list[str] = field(default_factory=list)
     observations: list[str] = field(default_factory=list)
 
@@ -209,6 +230,7 @@ class TacticAnalyticsEngine:
         self._confidence_distribution(events, result)
         self._candidate_ranking(events, result)
         self._rolling_win_rates(events, result)
+        self._streak_analysis(events, result)
         self._generate_observations(result)
 
         return result
@@ -473,6 +495,47 @@ class TacticAnalyticsEngine:
             w.finalize()
             result.rolling_win_rates.by_strategy_last_10[sid] = w
 
+    def _streak_analysis(self, events: list[TacticalEvent], result: AnalyticsResult) -> None:
+        """Detect consecutive win/loss streaks per strategy. Flag loss streaks >= threshold."""
+        from collections import defaultdict
+
+        outcomes_by_strategy: dict[str, list[TacticalEvent]] = defaultdict(list)
+        for e in events:
+            if (
+                e.event_type == EventType.TRADE_OUTCOME
+                and e.outcome in (Outcome.WIN, Outcome.LOSS)
+            ):
+                outcomes_by_strategy[e.strategy_id].append(e)
+
+        for sid, evts in outcomes_by_strategy.items():
+            evts.sort(key=lambda e: e.timestamp)
+            stats = StrategyStreakStats(strategy_id=sid)
+
+            current = 0
+            max_win = 0
+            max_loss = 0
+
+            for e in evts:
+                if e.outcome == Outcome.WIN:
+                    current = current + 1 if current > 0 else 1
+                else:
+                    current = current - 1 if current < 0 else -1
+
+                if current > 0:
+                    max_win = max(max_win, current)
+                else:
+                    max_loss = max(max_loss, abs(current))
+
+            stats.current_streak = current
+            stats.max_win_streak = max_win
+            stats.max_loss_streak = max_loss
+            stats.current_loss_streak = abs(current) if current < 0 else 0
+            stats.flagged = stats.current_loss_streak >= LOSS_STREAK_FLAG_THRESHOLD
+
+            result.streak_analysis.by_strategy[sid] = stats
+            if stats.flagged:
+                result.streak_analysis.flagged_strategies.append(sid)
+
     def _generate_observations(self, result: AnalyticsResult) -> None:
         obs = result.observations
         oq = result.open_questions
@@ -509,6 +572,13 @@ class TacticAnalyticsEngine:
             oq.append(
                 "High-score recommendations have a lower win rate than low-score recommendations. "
                 "Score calibration may need review."
+            )
+
+        for sid in result.streak_analysis.flagged_strategies:
+            streak = result.streak_analysis.by_strategy[sid].current_loss_streak
+            obs.append(
+                f"Strategy '{sid}' has a current loss streak of {streak} "
+                f"(threshold: {LOSS_STREAK_FLAG_THRESHOLD})."
             )
 
         if result.rejection_stats.rejection_rate is not None:
