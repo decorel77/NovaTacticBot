@@ -1,7 +1,40 @@
 # NovaTacticBot — Savegame
 
-**Session:** 2026-06-09 (Autonomous Cycle)  
-**Milestone:** Phase 2 — COMPLETE | TACTIC-EL-001 DONE | TACTIC-HA-003 DONE  
+**Session:** 2026-06-09 (Autonomous Cycle 2)  
+**Milestone:** Phases 3–6 IN PROGRESS | 7 tasks DONE this session | 164 tests passing  
+
+---
+
+## Session 6 — 2026-06-09 — Autonomous Cycle 3 (MASTER tasks 21,5,4,15)
+
+**Focus:** 4 NovaTacticBot tasks from NOVA_MASTER_TASK_QUEUE (Cycle 3).
+
+**What was done:**
+
+1. **TACTIC-RP-005** (MASTER-021) — `utils/tactic_snapshot_writer.py` — writes `data/system/result_snapshot.json` for NovaBridge consumption. Fields: phase, status, top_strategy, top_regime_fit, event_count, edge_erosion_warnings, recommendation_quality_score. (5 tests)
+2. **TACTIC-EL-005** (MASTER-005) — `utils/run_history_tracker.py` — appends run summaries to `data/system/run_history.json`. Fields: timestamp, run_id, run_count, events_processed, reports_generated, errors. (5 tests)
+3. **TACTIC-EL-003** (MASTER-004) — `utils/adapter_error_logger.py` — logs ADAPTER_ERROR events to `data/logs/tactic_adapter_errors.jsonl` when adapters fail to parse source files. (5 tests)
+4. **TACTIC-DB-003** (MASTER-015) — `workflow/tactic_html_dashboard.py` — self-contained HTML dashboard: strategy table, regime breakdown, edge erosion warnings, recommendation quality. (5 tests)
+
+**Test count:** 164 → 184 (+20)
+
+---
+
+## Session 5 — 2026-06-09 — Autonomous Cycle 2 (MASTER tasks 3,7,8,9,13,14)
+
+**Focus:** 6 NovaTacticBot tasks from NOVA_MASTER_TASK_QUEUE.
+
+**What was done:**
+
+1. **TACTIC-EL-002** — `utils/tactic_run_log_writer.py` — run log writer (9 tests)
+2. **TACTIC-HA-004** — `utils/analytics_baseline_writer.py` — baseline snapshot storage (10 tests)
+3. **TACTIC-SA-003** — `_streak_analysis` pass in engine — streak detection, flag loss ≥ 3 (8 tests)
+4. **TACTIC-SA-005** — `_edge_erosion_analysis` pass — EDGE_EROSION_WARNING when rolling ≥ 10pp below baseline (7 tests)
+5. **TACTIC-RA-002** — `_regime_bias_analysis` pass — REGIME_BIAS when 2× expected trade frequency (7 tests)
+6. **TACTIC-SA-004** — `_score_calibration` pass — 10 decile buckets + CALIBRATION_WARNING (8 tests)
+7. AnalyticsResult extended with: `streak_analysis`, `edge_erosion`, `regime_bias`, `score_calibration`
+
+**Test count:** 99 → 164 (+65)
 
 ---
 
