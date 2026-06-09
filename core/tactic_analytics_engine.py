@@ -186,6 +186,31 @@ REGIME_BIAS_MULTIPLIER = 2.0       # trade frequency > 2x expected base rate tri
 
 
 @dataclass
+class ScoreDecileBucket:
+    decile: int                     # 1 = lowest scores, 10 = highest
+    score_min: float
+    score_max: float
+    event_count: int = 0
+    outcomes: int = 0
+    wins: int = 0
+    win_rate: Optional[float] = None
+
+    def finalize(self) -> None:
+        if self.outcomes > 0:
+            self.win_rate = self.wins / self.outcomes
+
+
+@dataclass
+class ScoreCalibration:
+    """Checks whether high signal scores predict better outcomes."""
+    decile_buckets: list[ScoreDecileBucket] = field(default_factory=list)
+    calibration_coefficient: Optional[float] = None   # Spearman-like: 1.0 = perfect monotone
+    calibration_flag: bool = False   # True when rank-1 win rate < rank-5 win rate
+    calibration_note: str = ""
+    min_events_for_calibration: int = 5   # minimum events per decile to include in calc
+
+
+@dataclass
 class RegimeBiasWarning:
     regime: str
     observed_rate: float    # fraction of trade outcomes in this regime
@@ -237,6 +262,7 @@ class AnalyticsResult:
     streak_analysis: StreakAnalysis = field(default_factory=StreakAnalysis)
     edge_erosion: EdgeErosionAnalysis = field(default_factory=EdgeErosionAnalysis)
     regime_bias: RegimeBiasAnalysis = field(default_factory=RegimeBiasAnalysis)
+    score_calibration: ScoreCalibration = field(default_factory=ScoreCalibration)
     open_questions: list[str] = field(default_factory=list)
     observations: list[str] = field(default_factory=list)
 
@@ -268,6 +294,7 @@ class TacticAnalyticsEngine:
         self._streak_analysis(events, result)
         self._edge_erosion_analysis(result)
         self._regime_bias_analysis(events, result)
+        self._score_calibration(events, result)
         self._generate_observations(result)
 
         return result
@@ -532,6 +559,69 @@ class TacticAnalyticsEngine:
             w.finalize()
             result.rolling_win_rates.by_strategy_last_10[sid] = w
 
+    def _score_calibration(self, events: list[TacticalEvent], result: AnalyticsResult) -> None:
+        """Bucket scored TRADE_OUTCOME events into 10 deciles; compare win rates across deciles."""
+        sc = result.score_calibration
+
+        # Only trade outcomes with a score contribute
+        scored_outcomes = [
+            e for e in events
+            if e.event_type == EventType.TRADE_OUTCOME
+            and e.score is not None
+            and e.outcome in (Outcome.WIN, Outcome.LOSS)
+        ]
+
+        if not scored_outcomes:
+            sc.calibration_note = "No scored trade outcomes available for calibration."
+            return
+
+        # Sort by score ascending to assign deciles
+        scored_outcomes.sort(key=lambda e: e.score)  # type: ignore[arg-type]
+        n = len(scored_outcomes)
+
+        # Build 10 decile buckets (may have unequal sizes)
+        buckets: list[ScoreDecileBucket] = []
+        all_scores = [e.score for e in scored_outcomes]
+        score_min_all = min(all_scores)
+        score_max_all = max(all_scores)
+        step = (score_max_all - score_min_all) / 10 if score_max_all > score_min_all else 0.1
+
+        for d in range(1, 11):
+            lo = score_min_all + (d - 1) * step
+            hi = score_min_all + d * step if d < 10 else score_max_all + 1e-9
+            bucket = ScoreDecileBucket(decile=d, score_min=round(lo, 3), score_max=round(hi, 3))
+            for e in scored_outcomes:
+                if lo <= e.score < hi:  # type: ignore[operator]
+                    bucket.event_count += 1
+                    bucket.outcomes += 1
+                    if e.outcome == Outcome.WIN:
+                        bucket.wins += 1
+            bucket.finalize()
+            buckets.append(bucket)
+
+        sc.decile_buckets = buckets
+
+        # Calibration coefficient: compare rank-correlation of decile index vs win_rate
+        valid = [(b.decile, b.win_rate) for b in buckets if b.win_rate is not None and b.outcomes >= sc.min_events_for_calibration]
+        if len(valid) >= 3:
+            # Simple monotonicity score: fraction of consecutive pairs where win_rate increases
+            increases = sum(1 for i in range(len(valid) - 1) if valid[i + 1][1] > valid[i][1])
+            sc.calibration_coefficient = round(increases / (len(valid) - 1), 3)
+        else:
+            sc.calibration_note = f"Too few deciles with >= {sc.min_events_for_calibration} events for reliable calibration."
+
+        # Flag if lowest decile (rank-1) win rate < median decile (rank-5) win rate
+        rank1 = next((b for b in buckets if b.decile == 1 and b.win_rate is not None), None)
+        rank5 = next((b for b in buckets if b.decile == 5 and b.win_rate is not None), None)
+        if rank1 is not None and rank5 is not None:
+            if rank1.win_rate > rank5.win_rate:
+                sc.calibration_flag = True
+                sc.calibration_note = (
+                    f"CALIBRATION_WARNING: Decile-1 (lowest score) win rate "
+                    f"{rank1.win_rate:.0%} exceeds decile-5 win rate {rank5.win_rate:.0%}. "
+                    "Score may be inversely correlated with outcome."
+                )
+
     def _regime_bias_analysis(self, events: list[TacticalEvent], result: AnalyticsResult) -> None:
         """Detect over-trading in specific regimes relative to base rate.
 
@@ -689,6 +779,9 @@ class TacticAnalyticsEngine:
                 "High-score recommendations have a lower win rate than low-score recommendations. "
                 "Score calibration may need review."
             )
+
+        if result.score_calibration.calibration_flag and result.score_calibration.calibration_note:
+            obs.append(result.score_calibration.calibration_note)
 
         for w in result.regime_bias.warnings:
             obs.append(
