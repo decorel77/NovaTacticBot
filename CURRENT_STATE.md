@@ -1,7 +1,7 @@
 # NovaTacticBot — Current State
 
 **Date:** 2026-06-09  
-**Phase:** Phases 3–6 IN PROGRESS — Event Logging, Analytics, Strategy Analytics, Regime Analytics  
+**Phase:** Phases 3–6 COMPLETE + Phase 10 result_snapshot + Phase 11 HTML Dashboard  
 **Mode:** ADVISORY_ONLY = True  
 
 ---
@@ -40,6 +40,12 @@
 - `utils/tactic_event_logger.py` — internal event log schema + JSONL writer (TACTIC-EL-001)
 - `utils/tactic_run_log_writer.py` — run log writer (TACTIC-EL-002) — appends to `data/logs/tactic_run_log.jsonl`
 - `utils/analytics_baseline_writer.py` — persists baseline snapshots to `data/system/analytics_baseline.json` (TACTIC-HA-004)
+- `utils/adapter_error_logger.py` — ADAPTER_ERROR JSONL logger (TACTIC-EL-003) — appends to `data/logs/tactic_adapter_errors.jsonl`
+- `utils/run_history_tracker.py` — run summary tracker (TACTIC-EL-005) — appends to `data/system/run_history.json`
+- `utils/tactic_snapshot_writer.py` — writes `data/system/result_snapshot.json` for NovaBridge (TACTIC-RP-005)
+
+### Workflow
+- `workflow/tactic_html_dashboard.py` — self-contained HTML dashboard (TACTIC-DB-003) — writes `data/reports/tactic_dashboard.html`
 
 ### Tools
 - `tools/run_tacticbot.py` — CLI runner
@@ -47,7 +53,7 @@
 ### Task Queue
 - `data/system/task_queue.json` — 100 tasks across 15 phases (NOVA standard format)
 
-### Tests (164 passing)
+### Tests (184 passing)
 - `tests/test_tactic_event.py`
 - `tests/test_options_adapter.py`
 - `tests/test_analytics_engine.py`
@@ -63,6 +69,10 @@
 - `tests/test_edge_erosion.py` — NEW (7 tests)
 - `tests/test_regime_bias.py` — NEW (7 tests)
 - `tests/test_score_calibration.py` — NEW (8 tests)
+- `tests/test_tactic_snapshot_writer.py` — NEW (5 tests)
+- `tests/test_run_history_tracker.py` — NEW (5 tests)
+- `tests/test_adapter_error_logger.py` — NEW (5 tests)
+- `tests/test_tactic_html_dashboard.py` — NEW (5 tests)
 
 ### Reports Generated
 - `data/reports/tacticbot_report.md`
@@ -101,25 +111,21 @@ python tools/run_tacticbot.py --nova-options-dir "C:\NovaGPT\Apps\NovaBotV2Optio
 
 ## What Is NOT Yet Built
 
-- NovaBotV2 adapter (TACTIC-DC-004) — requires schema coordination
-- MarketRegimeBot adapter (TACTIC-DC-005)
+- NovaBotV2 adapter (TACTIC-DC-004) — requires schema coordination (human approval)
+- MarketRegimeBot adapter (TACTIC-DC-005) — blocked on MASTER-017
 - NovaAllocationBot adapter (TACTIC-DC-006)
 - NovaMemoryBot adapter (TACTIC-DC-007)
 - NovaBridge adapter (TACTIC-DC-008)
-- Run log → run history tracker (TACTIC-EL-005, depends on TACTIC-EL-002 ✓)
-- Adapter error event logging (TACTIC-EL-003, depends on TACTIC-EL-002 ✓)
-- Historical baseline trend analysis (TACTIC-HA-005)
+- Historical baseline trend analysis (TACTIC-HA-005) — blocked on MASTER-005 ✓ + MASTER-007 ✓ → now unblocked
 - Regime-strategy fit matrix (TACTIC-RA-003)
-- HTML dashboard (TACTIC-DB-003, depends on TACTIC-SA-005 ✓ + TACTIC-RA-002 ✓)
 - JSON analytics export (TACTIC-RP-002)
-- result_snapshot.json for NovaBridge (TACTIC-RP-005, depends on TACTIC-RP-002)
+- Multi-source data merge (TACTIC-DC-009) — blocked on MASTER-032 (human approval)
 
 ---
 
 ## Recommended Next Steps
 
-1. **TACTIC-EL-003** — Adapter error event logging (unblocked by TACTIC-EL-002 ✓)
-2. **TACTIC-EL-005** — Run history tracker (unblocked by TACTIC-EL-002 ✓)
-3. **TACTIC-RP-002** — JSON analytics export (unblocks result_snapshot + HTML dashboard chain)
-4. **TACTIC-RA-003** — Regime-strategy fit matrix (unblocked by TACTIC-RA-001 ✓)
-5. **TACTIC-DB-003** — HTML dashboard (unblocked by TACTIC-SA-005 ✓ + TACTIC-RA-002 ✓)
+1. **TACTIC-HA-005** — Cross-run trend analysis (unblocked now by run_history ✓ + baseline ✓)
+2. **MASTER-022** — NovaBridge TacticBot adapter (unblocked by result_snapshot ✓)
+3. **TACTIC-RP-002** — JSON analytics export
+4. **TACTIC-RA-003** — Regime-strategy fit matrix
