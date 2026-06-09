@@ -1,4 +1,4 @@
-[
+﻿[
   {
     "id": "TACTIC-F-001",
     "title": "Create repository structure and safety contracts",
@@ -345,7 +345,7 @@
     "title": "Implement TacticBot run log writer",
     "phase": "PHASE_3",
     "phase_name": "Event Logging",
-    "status": "TODO",
+    "status": "DONE",
     "priority": "P1",
     "risk": "LOW",
     "task_type": "logging",
