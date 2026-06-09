@@ -30,6 +30,7 @@
 - `adapters/base_adapter.py` — abstract `BaseAdapter`
 - `adapters/options_adapter.py` — generic JSON/CSV/log adapter
 - `adapters/nova_options_adapter.py` — real NovaBotV2Options directory adapter
+- `adapters/nova_botv2_adapter.py` — NovaBotV2 result_snapshot adapter → SYSTEM_EVENT per run (TACTIC-DC-004)
   - Parses: `decision_audit_trail.jsonl`, `options_events.jsonl`, `recommendation_accuracy.json`
   - Supplementary: `strategy_performance.json`, `regime_performance.json`, `signal_lifecycle_summary.json`
   - Full `AdapterDiagnostics`
@@ -54,7 +55,7 @@
 ### Task Queue
 - `data/system/task_queue.json` — 100 tasks across 15 phases (NOVA standard format)
 
-### Tests (205 passing)
+### Tests (226 passing)
 - `tests/test_tactic_event.py`
 - `tests/test_options_adapter.py`
 - `tests/test_analytics_engine.py`
@@ -75,6 +76,7 @@
 - `tests/test_adapter_error_logger.py` — NEW (5 tests)
 - `tests/test_tactic_html_dashboard.py` — NEW (5 tests)
 - `tests/test_cross_run_trend_analyser.py` — NEW (21 tests)
+- `tests/test_nova_botv2_adapter.py` — NEW (21 tests)
 
 ### Reports Generated
 - `data/reports/tacticbot_report.md`

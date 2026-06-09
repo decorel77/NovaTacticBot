@@ -200,7 +200,7 @@
     "title": "Create NovaBotV2 adapter",
     "phase": "PHASE_2",
     "phase_name": "Data Collection",
-    "status": "TODO",
+    "status": "DONE",
     "priority": "P1",
     "risk": "LOW",
     "task_type": "data_collection",
