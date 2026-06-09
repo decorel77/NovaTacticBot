@@ -1,7 +1,7 @@
 # NovaTacticBot — Current State
 
 **Date:** 2026-06-09  
-**Phase:** Phase 2 — Real Data Integration — COMPLETE  
+**Phase:** Phase 2 — Real Data Integration — COMPLETE | Task Queue Architecture Cycle — COMPLETE  
 **Mode:** ADVISORY_ONLY = True  
 
 ---
@@ -9,15 +9,16 @@
 ## What Exists
 
 ### Documentation
-- `docs/architecture/tactic_data_contract.md` — universal event schema
+- `docs/architecture/tactic_data_contract.md` — universal event schema v1.0
 - `docs/architecture/tacticbot_guardrails.md` — hard operational boundaries
 - `docs/architecture/vision.md` — why TacticBot exists
+- `docs/novatacticbot_roadmap.md` — **NEW** canonical full roadmap (14 phases + future ecosystem)
 
 ### Core
 - `core/tactic_event.py` — `TacticalEvent` dataclass + enumerations (contract v1.0)
 - `core/tactic_analytics_engine.py` — all analytics passes v2, returns `AnalyticsResult`
   - Strategy analysis, regime analysis, rejection analysis, recommendation quality
-  - **NEW (Phase 2):** Symbol concentration, confidence distribution, candidate ranking
+  - Symbol concentration, confidence distribution, candidate ranking
 
 ### Adapters
 - `adapters/base_adapter.py` — abstract `BaseAdapter`
@@ -25,34 +26,33 @@
 - `adapters/nova_options_adapter.py` — real NovaBotV2Options directory adapter
   - Parses: `decision_audit_trail.jsonl`, `options_events.jsonl`, `recommendation_accuracy.json`
   - Supplementary: `strategy_performance.json`, `regime_performance.json`, `signal_lifecycle_summary.json`
-  - Fallback: `decision_audit_summary.json` (used when JSONL is absent)
-  - Full `AdapterDiagnostics` with files found/missing/skipped, parse errors, schema mismatches
+  - Fallback: `decision_audit_summary.json`
+  - Full `AdapterDiagnostics`
 
 ### Utils
 - `utils/guardrails.py` — startup checks, `ADVISORY_ONLY = True`
-- `utils/tactic_report_generator.py` — renders AnalyticsResult → markdown
-  - `tacticbot_report.md` — main intelligence report
-  - `adapter_diagnostics.md` — **NEW** separate diagnostics file
+- `utils/tactic_report_generator.py` — renders AnalyticsResult → markdown + diagnostics
 
 ### Tools
-- `tools/run_tacticbot.py` — CLI runner with `--nova-options-dir` and `--warn-broker-env`
+- `tools/run_tacticbot.py` — CLI runner
+
+### Task Queue (NEW — canonical location)
+- `data/system/task_queue.json` — **100 tasks across 15 phases** (NOVA standard format)
+- `task_queue.json` — legacy root-level queue (kept for reference, superseded by above)
 
 ### Tests (99 passing)
 - `tests/test_tactic_event.py`
 - `tests/test_options_adapter.py`
 - `tests/test_analytics_engine.py`
-- `tests/test_analytics_engine_v2.py` — **NEW** symbol concentration, confidence, ranking, diagnostics
+- `tests/test_analytics_engine_v2.py`
 - `tests/test_report_generator.py`
 - `tests/test_readonly_behavior.py`
-- `tests/test_nova_options_adapter.py` — real-data integration tests
-
-### Fixtures
-- `tests/fixtures/nova_options/` — sanitized NovaBotV2Options data for tests
+- `tests/test_nova_options_adapter.py`
 
 ### Reports Generated
-- `data/reports/tacticbot_report.md` — intelligence report with v2 analytics sections
-- `data/reports/adapter_diagnostics.md` — **NEW** standalone diagnostics file
-- `data/reports/source_inventory.md` — **NEW** source discovery and schema documentation
+- `data/reports/tacticbot_report.md`
+- `data/reports/adapter_diagnostics.md`
+- `data/reports/source_inventory.md`
 
 ---
 
@@ -61,43 +61,45 @@
 | Metric | Value |
 |---|---|
 | Events loaded | 18 |
-| Source files parsed | decision_audit_trail.jsonl, options_events.jsonl, recommendation_accuracy.json, strategy_performance.json, regime_performance.json, signal_lifecycle_summary.json |
 | Strategies observed | 4 (LONG_CALL, CASH_SECURED_PUT, COVERED_CALL, chain_filter_AAPL) |
 | Regimes observed | 4 (BULL, BEAR, NORMAL, UNKNOWN) |
 | Symbols tracked | 5 (AAPL, SPY, MSFT, TSLA, QQQ) |
 | Completed trades (paper) | 5 |
-| Chain rejections (deduplicated) | 1 |
-| Signal rejections | 10 |
 | Adapter errors | 0 |
-| Records skipped | 299 (duplicate chain rejection log lines) |
+
+---
+
+## Task Queue Architecture — 2026-06-09
+
+This session completed the NOVA task queue architecture review cycle:
+
+- `data/system/task_queue.json` created with 100 tasks, NOVA standard fields
+- All 100 tasks have: `id`, `title`, `phase`, `phase_name`, `status`, `priority`, `risk`, `task_type`, `summary`, `dependencies`, `allowed_under_current_architecture`, `runtime_effect`, `broker_execution`, `live_trading_readiness`
+- 26 tasks already DONE (Phases 1–2 work + analytics v1/v2)
+- 47 tasks TODO/PLANNED
+- 22 tasks FUTURE
+- 5 tasks PLANNING (ecosystem stubs)
 
 ---
 
 ## NovaBotV2Options Write-Safety Verification
 
-TacticBot writes no files to the source repository. Verified: `test_no_writes_to_fixture_dir` passes.
+TacticBot writes no files to source repositories. Confirmed. `test_no_writes_to_fixture_dir` passes.
 
 ---
 
 ## Known Environment Issue
 
-`ib_insync` is installed in the shared Python environment (same env used by NovaBotV2Options).
-The guardrail correctly detects and flags this. Use `--warn-broker-env` for development runs.
-For production, run TacticBot in a clean virtualenv.
+`ib_insync` is installed in the shared Python environment. Use `--warn-broker-env` on this machine.
 
 ---
 
 ## How to Run
 
 ```bash
-# Real NovaBotV2Options directory (developer machine):
 cd C:\NovaGPT\Apps\NovaTacticBot
 python tools/run_tacticbot.py --nova-options-dir "C:\NovaGPT\Apps\NovaBotV2Options" --warn-broker-env
 ```
-
-Generates:
-- `data/reports/tacticbot_report.md`
-- `data/reports/adapter_diagnostics.md`
 
 ---
 
@@ -112,29 +114,26 @@ python -m pytest tests/ -v
 
 ## What Is NOT Yet Built
 
-- NovaBotV2 adapter
-- MarketRegimeBot adapter
-- NovaAllocationBot adapter
-- NovaBridge adapter
-- Bias detection analytics (regime bias, score calibration, temporal patterns, streak analysis)
-- Advisory suggestion generation
-- Edge erosion detection
-- Scheduled reporting
+- NovaBotV2 adapter (TACTIC-DC-004)
+- MarketRegimeBot adapter (TACTIC-DC-005)
+- NovaAllocationBot adapter (TACTIC-DC-006)
+- NovaMemoryBot adapter (TACTIC-DC-007)
+- NovaBridge adapter (TACTIC-DC-008)
+- Internal event logging (PHASE_3)
+- Rolling window win-rate tracker (TACTIC-HA-003)
+- Historical baseline storage (TACTIC-HA-004)
+- Bias detection: streak, score calibration, edge erosion (PHASE_5)
+- Regime bias detector and fit matrix (PHASE_6)
+- HTML dashboard (TACTIC-DB-003)
+- JSON analytics export (TACTIC-RP-002)
+- result_snapshot.json for NovaBridge (TACTIC-RP-005)
 
 ---
 
-## Readiness for Phase 3 (Bias Detection)
+## Recommended Next Steps
 
-| Criterion | Status |
-|---|---|
-| Real NovaBotV2Options data ingested | READY |
-| Intelligence report with v2 analytics | READY |
-| Symbol concentration analysis | READY |
-| Confidence distribution analysis | READY |
-| Candidate ranking | READY |
-| Separate diagnostics report | READY |
-| Source inventory documented | READY |
-| Write-safety confirmed | READY |
-| 99 tests passing | READY |
-| Multi-bot adapter architecture stable | READY |
-| Next: Bias detection or multi-bot adapters | PENDING |
+1. **PHASE_3 Event Logging** — TACTIC-EL-001 to EL-003 (no external dependencies)
+2. **PHASE_2 NovaBotV2 adapter** — TACTIC-DC-004 (coordinate with NovaBotV2 maintainer)
+3. **PHASE_5 Strategy Analytics** — TACTIC-SA-003/004 (streak detection + score calibration)
+4. **PHASE_4 Rolling windows** — TACTIC-HA-003/004
+5. **PHASE_10 result_snapshot** — TACTIC-RP-005 (enables NovaBridge integration)

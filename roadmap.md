@@ -1,12 +1,16 @@
 # NovaTacticBot Roadmap
 
+> **Authority note:** The canonical full roadmap is at `docs/novatacticbot_roadmap.md`.  
+> The canonical task queue is at `data/system/task_queue.json` (100 tasks).  
+> This file provides a high-level summary overview.
+
 ## Guiding Principle
 
 > TacticBot learns. TacticBot observes. TacticBot reports. TacticBot never acts.
 
 ---
 
-## Current Phase: Phase 2 Complete — Ready for Bias Detection or Multi-Bot Support
+## Current Phase: Phase 2 Complete — Task Queue Expansion Complete (2026-06-09)
 
 Phase 2 is delivered. Real data flows from NovaBotV2Options. Analytics v2 is live.
 
