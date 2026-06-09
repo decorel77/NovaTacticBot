@@ -489,7 +489,7 @@
     "title": "Historical baseline snapshot storage",
     "phase": "PHASE_4",
     "phase_name": "Historical Analytics",
-    "status": "TODO",
+    "status": "DONE",
     "priority": "P1",
     "risk": "LOW",
     "task_type": "analytics",
@@ -1810,3 +1810,4 @@
     "live_trading_readiness": "not_applicable"
   }
 ]
+
