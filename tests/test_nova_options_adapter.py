@@ -257,16 +257,22 @@ class TestAnalyticsPipeline:
         result = TacticAnalyticsEngine().run(events)
 
         gen = TacticReportGenerator()
+        diag_path = tmp_path / "adapter_diagnostics.md"
         path = gen.generate(
             result,
             output_path=tmp_path / "report.md",
             diagnostics=adapter.diagnostics,
+            diagnostics_path=diag_path,
             supplementary={
                 "strategy_performance": adapter.strategy_performance,
                 "regime_performance": adapter.regime_performance,
             },
         )
         content = path.read_text()
-        assert "Adapter Diagnostics" in content
         assert "NovaBotV2Options Strategy Performance" in content
         assert "advisory only" in content.lower()
+        # Diagnostics are now in a separate file
+        assert diag_path.exists()
+        diag_content = diag_path.read_text()
+        assert "Adapter Diagnostics" in diag_content
+        assert "Files Discovered" in diag_content

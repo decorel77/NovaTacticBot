@@ -127,6 +127,7 @@ def main() -> int:
         supplementary = {
             "strategy_performance": nova_adapter.strategy_performance,
             "regime_performance": nova_adapter.regime_performance,
+            "lifecycle_summary": nova_adapter.lifecycle_summary,
         }
         logger.info(
             "NovaBotV2OptionsAdapter: %d events (diagnostics: %d skipped, %d errors)",
@@ -167,13 +168,17 @@ def main() -> int:
     # ── Step 5: Report generation ──────────────────────────────────────────────
     report_path = Path(args.report_dir) / args.report_name
     generator = TacticReportGenerator()
+    diag_path = Path(args.report_dir) / "adapter_diagnostics.md"
     written_path = generator.generate(
         result,
         output_path=report_path,
         diagnostics=diagnostics,
         supplementary=supplementary,
+        diagnostics_path=diag_path,
     )
     logger.info("Report written: %s", written_path)
+    if diagnostics is not None:
+        logger.info("Diagnostics written: %s", diag_path)
 
     # ── Step 6: Summary ────────────────────────────────────────────────────────
     logger.info("=== NovaTacticBot run complete ===")

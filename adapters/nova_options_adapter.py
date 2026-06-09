@@ -88,6 +88,8 @@ class NovaBotV2OptionsAdapter(BaseAdapter):
     _REC_ACCURACY = "data/reports/recommendation_accuracy.json"
     _STRATEGY_PERF = "data/reports/strategy_performance.json"
     _REGIME_PERF = "data/reports/regime_performance.json"
+    _AUDIT_SUMMARY = "data/reports/decision_audit_summary.json"
+    _LIFECYCLE_SUMMARY = "data/reports/signal_lifecycle_summary.json"
 
     def __init__(self, source_dir: Optional[str | Path] = None) -> None:
         super().__init__(source_dir)
@@ -97,6 +99,7 @@ class NovaBotV2OptionsAdapter(BaseAdapter):
         # Pre-computed supplementary data loaded alongside events
         self.strategy_performance: dict[str, Any] = {}
         self.regime_performance: dict[str, Any] = {}
+        self.lifecycle_summary: dict[str, Any] = {}
 
     def _load_from_source(self) -> None:
         assert self.source_dir is not None
@@ -114,6 +117,8 @@ class NovaBotV2OptionsAdapter(BaseAdapter):
         # Supplementary (not converted to events, stored for report enrichment)
         self._load_strategy_performance(diag)
         self._load_regime_performance(diag)
+        self._load_audit_summary(diag, rec_lookup)
+        self._load_lifecycle_summary(diag)
 
         diag.events_parsed = len(self._events)
 
@@ -357,6 +362,55 @@ class NovaBotV2OptionsAdapter(BaseAdapter):
             self.regime_performance = json.loads(path.read_text(encoding="utf-8"))
         except Exception as e:
             diag.parse_errors.append(f"regime_performance.json: {e}")
+
+    # ── Loader: decision_audit_summary.json (supplementary; avoids re-loading JSONL) ──
+
+    def _load_audit_summary(
+        self,
+        diag: AdapterDiagnostics,
+        rec_lookup: dict[str, dict[str, Any]],
+    ) -> None:
+        """Parse decision_audit_summary.json and add events not already in _events.
+
+        The audit trail JSONL is the primary source; the summary JSON is an alternative
+        export of the same signals. We load it only when audit_trail.jsonl is missing,
+        to avoid duplicates.
+        """
+        path = self.source_dir / self._AUDIT_SUMMARY  # type: ignore[operator]
+        if not path.exists():
+            diag.record_missing(self._AUDIT_SUMMARY)
+            return
+        diag.record_found(self._AUDIT_SUMMARY)
+
+        # Skip if audit trail was already loaded (same data, different format)
+        if self._AUDIT_TRAIL in diag.files_found:
+            return
+
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except Exception as e:
+            diag.parse_errors.append(f"decision_audit_summary.json parse error: {e}")
+            return
+
+        for record in data.get("entries", []):
+            event = self._audit_record_to_event(record, rec_lookup, diag)
+            if event is not None:
+                self._add_event(event)
+                source = "audit_summary"
+                diag.source_breakdown[source] = diag.source_breakdown.get(source, 0) + 1
+
+    # ── Loader: signal_lifecycle_summary.json (aggregates only — for diagnostics) ──
+
+    def _load_lifecycle_summary(self, diag: AdapterDiagnostics) -> None:
+        path = self.source_dir / self._LIFECYCLE_SUMMARY  # type: ignore[operator]
+        if not path.exists():
+            diag.record_missing(self._LIFECYCLE_SUMMARY)
+            return
+        diag.record_found(self._LIFECYCLE_SUMMARY)
+        try:
+            self.lifecycle_summary = json.loads(path.read_text(encoding="utf-8"))
+        except Exception as e:
+            diag.parse_errors.append(f"signal_lifecycle_summary.json: {e}")
 
 
 def _safe_float(value: Any) -> Optional[float]:

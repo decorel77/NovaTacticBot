@@ -1,13 +1,12 @@
 {
   "bot": "NovaTacticBot",
-  "version": "1.1",
+  "version": "2.0",
   "last_updated": "2026-06-09",
   "phases": [
     {
       "phase_id": "FOUNDATION",
       "name": "Foundation",
       "status": "COMPLETE",
-      "description": "Repository skeleton, data contract, guardrails, architecture documentation",
       "tasks": [
         { "id": "F-001", "name": "Create repository structure", "status": "COMPLETE" },
         { "id": "F-002", "name": "Define tactic_data_contract.md", "status": "COMPLETE" },
@@ -18,36 +17,28 @@
       ]
     },
     {
-      "phase_id": "ADAPTER_LAYER",
-      "name": "Adapter Layer",
+      "phase_id": "REAL_DATA_INTEGRATION",
+      "name": "Real Data Integration",
       "status": "COMPLETE",
-      "description": "Base adapter interface, generic OptionsAdapter, and real NovaBotV2OptionsAdapter",
+      "description": "Connect to NovaBotV2Options real data, generate tactical analytics",
       "tasks": [
-        { "id": "A-001", "name": "Create BaseAdapter abstract class", "status": "COMPLETE" },
-        { "id": "A-002", "name": "Create OptionsAdapter (JSON, CSV, log formats)", "status": "COMPLETE" },
-        { "id": "A-003", "name": "Adapter unit tests", "status": "COMPLETE" },
-        { "id": "A-004", "name": "Create NovaBotV2OptionsAdapter (real directory structure)", "status": "COMPLETE" },
-        { "id": "A-005", "name": "AdapterDiagnostics (files found/missing, skipped, mismatches)", "status": "COMPLETE" },
-        { "id": "A-006", "name": "Real data integration tests with fixtures", "status": "COMPLETE" },
-        { "id": "A-007", "name": "First real tacticbot_report.md generated", "status": "COMPLETE" },
-        { "id": "A-008", "name": "Write-safety verified (NovaBotV2Options unchanged)", "status": "COMPLETE" }
-      ]
-    },
-    {
-      "phase_id": "TACTICAL_ANALYTICS",
-      "name": "Tactical Analytics",
-      "status": "COMPLETE",
-      "description": "Analytics engine and report generator",
-      "tasks": [
-        { "id": "T-001", "name": "Create TacticAnalyticsEngine", "status": "COMPLETE" },
-        { "id": "T-002", "name": "Strategy comparison pass", "status": "COMPLETE" },
-        { "id": "T-003", "name": "Regime analysis pass", "status": "COMPLETE" },
-        { "id": "T-004", "name": "Rejection analysis pass", "status": "COMPLETE" },
-        { "id": "T-005", "name": "Recommendation quality pass", "status": "COMPLETE" },
-        { "id": "T-006", "name": "Create TacticReportGenerator", "status": "COMPLETE" },
-        { "id": "T-007", "name": "Analytics engine unit tests", "status": "COMPLETE" },
-        { "id": "T-008", "name": "Report generator unit tests", "status": "COMPLETE" },
-        { "id": "T-009", "name": "Read-only behavior tests", "status": "COMPLETE" }
+        { "id": "RD-001", "name": "Discover real data sources — source inventory", "status": "COMPLETE" },
+        { "id": "RD-002", "name": "NovaBotV2OptionsAdapter (decision_audit_trail.jsonl)", "status": "COMPLETE" },
+        { "id": "RD-003", "name": "Parse options_events.jsonl (chain rejections)", "status": "COMPLETE" },
+        { "id": "RD-004", "name": "Parse recommendation_accuracy.json (PnL cross-reference)", "status": "COMPLETE" },
+        { "id": "RD-005", "name": "Parse strategy_performance.json (supplementary)", "status": "COMPLETE" },
+        { "id": "RD-006", "name": "Parse regime_performance.json (supplementary)", "status": "COMPLETE" },
+        { "id": "RD-007", "name": "Parse decision_audit_summary.json (fallback source)", "status": "COMPLETE" },
+        { "id": "RD-008", "name": "Parse signal_lifecycle_summary.json (supplementary)", "status": "COMPLETE" },
+        { "id": "RD-009", "name": "AdapterDiagnostics — files found/missing/skipped/errors", "status": "COMPLETE" },
+        { "id": "RD-010", "name": "Symbol concentration analysis", "status": "COMPLETE" },
+        { "id": "RD-011", "name": "Confidence (score) distribution analysis", "status": "COMPLETE" },
+        { "id": "RD-012", "name": "Candidate ranking analytics", "status": "COMPLETE" },
+        { "id": "RD-013", "name": "Generate data/reports/tacticbot_report.md", "status": "COMPLETE" },
+        { "id": "RD-014", "name": "Generate data/reports/adapter_diagnostics.md", "status": "COMPLETE" },
+        { "id": "RD-015", "name": "Generate data/reports/source_inventory.md", "status": "COMPLETE" },
+        { "id": "RD-016", "name": "Expanded tests — v2 analytics + diagnostics (99 passing)", "status": "COMPLETE" },
+        { "id": "RD-017", "name": "Update roadmap, CURRENT_STATE, savegame, task_queue", "status": "COMPLETE" }
       ]
     },
     {
@@ -79,34 +70,33 @@
       "phase_id": "TACTICAL_SUGGESTIONS",
       "name": "Tactical Suggestions",
       "status": "PLANNED",
-      "description": "Advisory suggestions section added to reports (human-review required)",
+      "description": "Advisory suggestions section in reports (human-review required)",
       "tasks": [
         { "id": "TS-001", "name": "Define suggestion schema", "status": "PLANNED" },
         { "id": "TS-002", "name": "Strategy scaling suggestions (advisory only)", "status": "PLANNED" },
-        { "id": "TS-003", "name": "Regime-strategy fit suggestions", "status": "PLANNED" },
-        { "id": "TS-004", "name": "Human approval workflow documentation", "status": "PLANNED" }
+        { "id": "TS-003", "name": "Regime-strategy fit suggestions", "status": "PLANNED" }
       ]
     },
     {
-      "phase_id": "PHASE_2",
-      "name": "Phase 2 — Edge Erosion Detection",
+      "phase_id": "EDGE_EROSION",
+      "name": "Edge Erosion Detection",
       "status": "FUTURE",
-      "description": "Longitudinal tracking to detect when a strategy's edge is diminishing",
+      "description": "Longitudinal tracking to detect when a strategy edge is diminishing",
       "tasks": [
-        { "id": "P2-001", "name": "Rolling window win-rate tracker", "status": "FUTURE" },
-        { "id": "P2-002", "name": "Edge erosion alert (advisory, report only)", "status": "FUTURE" },
-        { "id": "P2-003", "name": "Historical baseline storage in data/system/", "status": "FUTURE" }
+        { "id": "EE-001", "name": "Rolling window win-rate tracker", "status": "FUTURE" },
+        { "id": "EE-002", "name": "Edge erosion alert (advisory, report only)", "status": "FUTURE" },
+        { "id": "EE-003", "name": "Historical baseline storage in data/system/", "status": "FUTURE" }
       ]
     },
     {
-      "phase_id": "PHASE_3",
-      "name": "Phase 3 — Weekly Intelligence Briefings",
+      "phase_id": "WEEKLY_BRIEFINGS",
+      "name": "Weekly Intelligence Briefings",
       "status": "FUTURE",
       "description": "Automated weekly report generation covering all active NOVA bots",
       "tasks": [
-        { "id": "P3-001", "name": "Scheduled weekly report runner", "status": "FUTURE" },
-        { "id": "P3-002", "name": "Multi-bot executive briefing template", "status": "FUTURE" },
-        { "id": "P3-003", "name": "NovaMemoryBot integration for historical context", "status": "FUTURE" }
+        { "id": "WB-001", "name": "Scheduled weekly report runner", "status": "FUTURE" },
+        { "id": "WB-002", "name": "Multi-bot executive briefing template", "status": "FUTURE" },
+        { "id": "WB-003", "name": "NovaMemoryBot integration for historical context", "status": "FUTURE" }
       ]
     }
   ]

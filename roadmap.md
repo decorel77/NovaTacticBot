@@ -6,9 +6,9 @@
 
 ---
 
-## Current Phase: Foundation Complete
+## Current Phase: Phase 2 Complete — Ready for Bias Detection or Multi-Bot Support
 
-Phase 1 is delivered. The foundation is read-only, tested, and ready for real data.
+Phase 2 is delivered. Real data flows from NovaBotV2Options. Analytics v2 is live.
 
 ---
 
@@ -19,9 +19,24 @@ Phase 1 is delivered. The foundation is read-only, tested, and ready for real da
 - Tactical analytics engine (strategy, regime, rejection, recommendation quality)
 - Markdown report generator
 - Guardrail enforcement
-- Full test suite
+- Full test suite (78 tests)
 
-**Status:** Ready for NovaBotV2Options data ingestion
+**Status:** COMPLETE
+
+---
+
+## Phase 2 — Real Data Integration (COMPLETE)
+
+- NovaBotV2OptionsAdapter reading real directory structure
+- decision_audit_trail.jsonl + options_events.jsonl + recommendation_accuracy.json
+- decision_audit_summary.json fallback source
+- signal_lifecycle_summary.json supplementary data
+- Analytics Engine v2: symbol concentration, confidence distribution, candidate ranking
+- Separate adapter_diagnostics.md report
+- Source inventory with schema documentation
+- 99 tests passing
+
+**Status:** COMPLETE
 
 ---
 

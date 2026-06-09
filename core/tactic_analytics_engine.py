@@ -91,12 +91,66 @@ class DataQuality:
 
 
 @dataclass
+class SymbolConcentration:
+    """How often each symbol appears across all events."""
+    by_symbol: dict[str, int] = field(default_factory=dict)       # total events
+    outcomes_by_symbol: dict[str, int] = field(default_factory=dict)  # TRADE_OUTCOME count
+    rejections_by_symbol: dict[str, int] = field(default_factory=dict)
+    pnl_by_symbol: dict[str, float] = field(default_factory=dict)
+    top_symbols: list[str] = field(default_factory=list)          # sorted by total events
+
+
+@dataclass
+class ConfidenceBucket:
+    label: str
+    min_score: float
+    max_score: float
+    count: int = 0
+    wins: int = 0
+    losses: int = 0
+    win_rate: Optional[float] = None
+
+    def finalize(self) -> None:
+        total = self.wins + self.losses
+        if total > 0:
+            self.win_rate = self.wins / total
+
+
+@dataclass
+class ConfidenceDistribution:
+    """Score distribution bucketed into ranges."""
+    buckets: list[ConfidenceBucket] = field(default_factory=list)
+    total_scored: int = 0
+    avg_score: Optional[float] = None
+
+
+@dataclass
+class CandidateRanking:
+    """Ranked list of symbols by composite desirability score."""
+
+    @dataclass
+    class RankedCandidate:
+        symbol: str
+        strategy_id: str
+        composite_score: float
+        total_events: int
+        win_rate: Optional[float]
+        avg_pnl: Optional[float]
+        avg_score: Optional[float]
+
+    candidates: list["CandidateRanking.RankedCandidate"] = field(default_factory=list)
+
+
+@dataclass
 class AnalyticsResult:
     strategy_stats: dict[str, StrategyStats] = field(default_factory=dict)
     regime_stats: dict[str, RegimeStats] = field(default_factory=dict)
     rejection_stats: RejectionStats = field(default_factory=RejectionStats)
     recommendation_quality: RecommendationQuality = field(default_factory=RecommendationQuality)
     data_quality: DataQuality = field(default_factory=DataQuality)
+    symbol_concentration: SymbolConcentration = field(default_factory=SymbolConcentration)
+    confidence_distribution: ConfidenceDistribution = field(default_factory=ConfidenceDistribution)
+    candidate_ranking: CandidateRanking = field(default_factory=CandidateRanking)
     open_questions: list[str] = field(default_factory=list)
     observations: list[str] = field(default_factory=list)
 
@@ -121,6 +175,9 @@ class TacticAnalyticsEngine:
         self._regime_analysis(events, result)
         self._rejection_analysis(events, result)
         self._recommendation_quality(events, result)
+        self._symbol_concentration(events, result)
+        self._confidence_distribution(events, result)
+        self._candidate_ranking(events, result)
         self._generate_observations(result)
 
         return result
@@ -261,6 +318,95 @@ class TacticAnalyticsEngine:
             rq.high_score_win_rate = high_score_wins / high_score_total
         if low_score_total > 0:
             rq.low_score_win_rate = low_score_wins / low_score_total
+
+    def _symbol_concentration(self, events: list[TacticalEvent], result: AnalyticsResult) -> None:
+        sc = result.symbol_concentration
+        for e in events:
+            symbol = e.metadata.get("symbol") if e.metadata else None
+            if not symbol:
+                continue
+            sc.by_symbol[symbol] = sc.by_symbol.get(symbol, 0) + 1
+            if e.event_type == EventType.TRADE_OUTCOME:
+                sc.outcomes_by_symbol[symbol] = sc.outcomes_by_symbol.get(symbol, 0) + 1
+                if e.realized_pnl is not None:
+                    sc.pnl_by_symbol[symbol] = sc.pnl_by_symbol.get(symbol, 0.0) + e.realized_pnl
+            if e.event_type == EventType.REJECTION:
+                sc.rejections_by_symbol[symbol] = sc.rejections_by_symbol.get(symbol, 0) + 1
+        sc.top_symbols = sorted(sc.by_symbol, key=lambda s: -sc.by_symbol[s])
+
+    def _confidence_distribution(self, events: list[TacticalEvent], result: AnalyticsResult) -> None:
+        cd = result.confidence_distribution
+        ranges = [
+            ("< 0.5", 0.0, 0.5),
+            ("0.5–0.6", 0.5, 0.6),
+            ("0.6–0.7", 0.6, 0.7),
+            ("0.7–0.8", 0.7, 0.8),
+            ("0.8–1.0", 0.8, 1.01),
+        ]
+        cd.buckets = [
+            ConfidenceBucket(label=label, min_score=lo, max_score=hi)
+            for label, lo, hi in ranges
+        ]
+        score_sum = 0.0
+        count = 0
+        for e in events:
+            if e.score is None:
+                continue
+            cd.total_scored += 1
+            score_sum += e.score
+            count += 1
+            for b in cd.buckets:
+                if b.min_score <= e.score < b.max_score:
+                    b.count += 1
+                    if e.event_type == EventType.TRADE_OUTCOME:
+                        if e.outcome == Outcome.WIN:
+                            b.wins += 1
+                        elif e.outcome == Outcome.LOSS:
+                            b.losses += 1
+                    break
+        for b in cd.buckets:
+            b.finalize()
+        if count:
+            cd.avg_score = score_sum / count
+
+    def _candidate_ranking(self, events: list[TacticalEvent], result: AnalyticsResult) -> None:
+        # Build per (symbol, strategy) stats for ranking
+        from collections import defaultdict
+        key_events: dict[tuple, list] = defaultdict(list)
+        for e in events:
+            symbol = e.metadata.get("symbol") if e.metadata else None
+            if symbol and e.strategy_id:
+                key_events[(symbol, e.strategy_id)].append(e)
+
+        candidates = []
+        for (symbol, strat), evts in key_events.items():
+            outcomes = [e for e in evts if e.event_type == EventType.TRADE_OUTCOME]
+            wins = sum(1 for e in outcomes if e.outcome == Outcome.WIN)
+            win_rate = wins / len(outcomes) if outcomes else None
+            pnl_vals = [e.realized_pnl for e in outcomes if e.realized_pnl is not None]
+            avg_pnl = sum(pnl_vals) / len(pnl_vals) if pnl_vals else None
+            scores = [e.score for e in evts if e.score is not None]
+            avg_score = sum(scores) / len(scores) if scores else None
+
+            # Composite: avg_score * win_rate (penalize unknowns)
+            wr_factor = win_rate if win_rate is not None else 0.5
+            sc_factor = avg_score if avg_score is not None else 0.5
+            composite = sc_factor * wr_factor
+
+            candidates.append(
+                CandidateRanking.RankedCandidate(
+                    symbol=symbol,
+                    strategy_id=strat,
+                    composite_score=composite,
+                    total_events=len(evts),
+                    win_rate=win_rate,
+                    avg_pnl=avg_pnl,
+                    avg_score=avg_score,
+                )
+            )
+
+        candidates.sort(key=lambda c: -c.composite_score)
+        result.candidate_ranking.candidates = candidates
 
     def _generate_observations(self, result: AnalyticsResult) -> None:
         obs = result.observations

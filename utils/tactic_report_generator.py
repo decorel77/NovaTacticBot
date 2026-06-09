@@ -1,7 +1,8 @@
 """
-Tactic Report Generator — converts AnalyticsResult into a markdown report.
+Tactic Report Generator — converts AnalyticsResult into markdown reports.
 
 Writes to data/reports/tacticbot_report.md (or a caller-specified path).
+Also writes data/reports/adapter_diagnostics.md when diagnostics are provided.
 Never writes outside the NovaTacticBot directory.
 """
 
@@ -20,6 +21,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 DEFAULT_REPORT_PATH = Path("data/reports/tacticbot_report.md")
+DEFAULT_DIAGNOSTICS_PATH = Path("data/reports/adapter_diagnostics.md")
 
 
 class TacticReportGenerator:
@@ -31,10 +33,12 @@ class TacticReportGenerator:
         source_description: str = "NovaBotV2Options",
         diagnostics: "Optional[AdapterDiagnostics]" = None,
         supplementary: "Optional[dict]" = None,
+        diagnostics_path: Optional[Path] = None,
     ) -> Path:
         """
         Render the AnalyticsResult to markdown and write to output_path.
-        Returns the path where the report was written.
+        Also writes a separate adapter_diagnostics.md when diagnostics are provided.
+        Returns the path where the main report was written.
         """
         path = output_path or DEFAULT_REPORT_PATH
         path = Path(path)
@@ -43,6 +47,16 @@ class TacticReportGenerator:
         report = self._render(result, source_description, diagnostics, supplementary)
         path.write_text(report, encoding="utf-8")
         logger.info("Report written to %s", path)
+
+        # Write separate diagnostics file
+        if diagnostics is not None:
+            diag_path = diagnostics_path or path.parent / DEFAULT_DIAGNOSTICS_PATH.name
+            diag_path = Path(diag_path)
+            diag_path.parent.mkdir(parents=True, exist_ok=True)
+            diag_content = self._render_diagnostics(diagnostics, supplementary)
+            diag_path.write_text(diag_content, encoding="utf-8")
+            logger.info("Diagnostics report written to %s", diag_path)
+
         return path
 
     # ── Rendering ──────────────────────────────────────────────────────────────
@@ -57,16 +71,18 @@ class TacticReportGenerator:
         sections = [
             self._header(source),
             self._executive_summary(result),
+            self._symbol_concentration(result),
             self._strategy_analysis(result),
             self._regime_analysis(result),
+            self._confidence_distribution(result),
+            self._candidate_ranking(result),
             self._recommendation_quality(result),
             self._rejection_analysis(result),
             self._data_quality(result),
-            self._adapter_diagnostics(diagnostics),
             self._supplementary_strategy_performance(supplementary),
             self._supplementary_regime_performance(supplementary),
+            self._tactical_observations(result),
             self._open_questions(result),
-            self._observations(result),
             self._footer(),
         ]
         return "\n\n".join(s for s in sections if s)
@@ -209,20 +225,170 @@ class TacticReportGenerator:
                 lines.append(f"- {bot}: {count}")
         return "\n".join(lines)
 
+    def _symbol_concentration(self, result: AnalyticsResult) -> str:
+        sc = result.symbol_concentration
+        if not sc.by_symbol:
+            return ""
+        lines = [
+            "## Symbol Concentration",
+            "",
+            "| Symbol | Total Events | Outcomes | Rejections | Total PnL |",
+            "|---|---|---|---|---|",
+        ]
+        for sym in sc.top_symbols[:15]:
+            outcomes = sc.outcomes_by_symbol.get(sym, 0)
+            rejections = sc.rejections_by_symbol.get(sym, 0)
+            pnl = sc.pnl_by_symbol.get(sym)
+            pnl_str = f"${pnl:+.2f}" if pnl is not None else "—"
+            lines.append(f"| {sym} | {sc.by_symbol[sym]} | {outcomes} | {rejections} | {pnl_str} |")
+        return "\n".join(lines)
+
+    def _confidence_distribution(self, result: AnalyticsResult) -> str:
+        cd = result.confidence_distribution
+        if not cd.buckets or cd.total_scored == 0:
+            return ""
+        lines = [
+            "## Confidence (Score) Distribution",
+            "",
+            f"_Total scored events: {cd.total_scored}"
+            + (f" | Average score: {cd.avg_score:.3f}" if cd.avg_score is not None else "")
+            + "_",
+            "",
+            "| Score Range | Events | Win Rate |",
+            "|---|---|---|",
+        ]
+        for b in cd.buckets:
+            wr = f"{b.win_rate:.1%}" if b.win_rate is not None else "—"
+            lines.append(f"| {b.label} | {b.count} | {wr} |")
+        return "\n".join(lines)
+
+    def _candidate_ranking(self, result: AnalyticsResult) -> str:
+        ranking = result.candidate_ranking
+        if not ranking.candidates:
+            return ""
+        lines = [
+            "## Candidate Ranking",
+            "",
+            "_Ranked by composite score (avg_score × win_rate). Advisory only._",
+            "",
+            "| Rank | Symbol | Strategy | Composite | Events | Win Rate | Avg PnL | Avg Score |",
+            "|---|---|---|---|---|---|---|---|",
+        ]
+        for i, c in enumerate(ranking.candidates[:10], 1):
+            wr = f"{c.win_rate:.1%}" if c.win_rate is not None else "—"
+            pnl = f"${c.avg_pnl:+.2f}" if c.avg_pnl is not None else "—"
+            sc = f"{c.avg_score:.3f}" if c.avg_score is not None else "—"
+            lines.append(
+                f"| {i} | {c.symbol} | {c.strategy_id} | {c.composite_score:.3f} "
+                f"| {c.total_events} | {wr} | {pnl} | {sc} |"
+            )
+        return "\n".join(lines)
+
+    def _tactical_observations(self, result: AnalyticsResult) -> str:
+        lines = []
+        if result.observations:
+            lines += ["## Tactical Observations", ""]
+            for obs in result.observations:
+                lines.append(f"- {obs}")
+        return "\n".join(lines) if lines else ""
+
     def _open_questions(self, result: AnalyticsResult) -> str:
         if not result.open_questions:
             return ""
-        lines = ["## Open Questions", ""]
+        lines = ["## Open Questions / Missing Data Warnings", ""]
         for q in result.open_questions:
             lines.append(f"- {q}")
         return "\n".join(lines)
 
-    def _observations(self, result: AnalyticsResult) -> str:
-        if not result.observations:
+    def _render_diagnostics(
+        self,
+        diagnostics: "AdapterDiagnostics",
+        supplementary: "Optional[dict]" = None,
+    ) -> str:
+        """Render a standalone adapter_diagnostics.md report."""
+        ts = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+        sections = [
+            f"# NovaTacticBot — Adapter Diagnostics\n\n"
+            f"**Generated:** {ts}  \n"
+            f"**Source directory:** `{diagnostics.source_dir}`  \n"
+            f"**Mode:** ADVISORY ONLY",
+            self._diagnostics_summary(diagnostics),
+            self._diagnostics_files(diagnostics),
+            self._diagnostics_records(diagnostics),
+            self._diagnostics_errors(diagnostics),
+            self._diagnostics_lifecycle(supplementary),
+            "---\n\n_NovaTacticBot diagnostics — no trades, no modifications made._",
+        ]
+        return "\n\n".join(s for s in sections if s)
+
+    def _diagnostics_summary(self, diagnostics: "AdapterDiagnostics") -> str:
+        return "\n".join([
+            "## Summary",
+            "",
+            f"- **Events parsed:** {diagnostics.events_parsed}",
+            f"- **Records skipped:** {diagnostics.records_skipped}",
+            f"- **Files found:** {len(diagnostics.files_found)}",
+            f"- **Files missing:** {len(diagnostics.files_missing)}",
+            f"- **Schema mismatches:** {len(diagnostics.schema_mismatches)}",
+            f"- **Parse errors:** {len(diagnostics.parse_errors)}",
+        ])
+
+    def _diagnostics_files(self, diagnostics: "AdapterDiagnostics") -> str:
+        lines = ["## Files Discovered"]
+        if diagnostics.files_found:
+            lines += ["", "**Found (parsed):**"]
+            for f in diagnostics.files_found:
+                lines.append(f"  - `{f}` ✓")
+        if diagnostics.files_missing:
+            lines += ["", "**Missing (expected but not found):**"]
+            for f in diagnostics.files_missing:
+                lines.append(f"  - `{f}` ✗")
+        if diagnostics.files_skipped:
+            lines += ["", "**Skipped:**"]
+            for f in diagnostics.files_skipped:
+                lines.append(f"  - `{f}`")
+        if diagnostics.source_breakdown:
+            lines += ["", "**Events by source file:**"]
+            for src, cnt in sorted(diagnostics.source_breakdown.items()):
+                lines.append(f"  - {src}: {cnt}")
+        return "\n".join(lines)
+
+    def _diagnostics_records(self, diagnostics: "AdapterDiagnostics") -> str:
+        lines = ["## Records Parsed"]
+        lines += [
+            "",
+            f"- **Total events produced:** {diagnostics.events_parsed}",
+            f"- **Records skipped (duplicates / malformed):** {diagnostics.records_skipped}",
+        ]
+        if diagnostics.schema_mismatches:
+            lines += ["", f"**Schema mismatches ({len(diagnostics.schema_mismatches)}):**"]
+            for m in diagnostics.schema_mismatches[:20]:
+                lines.append(f"  - {m}")
+            if len(diagnostics.schema_mismatches) > 20:
+                lines.append(f"  - … and {len(diagnostics.schema_mismatches) - 20} more")
+        return "\n".join(lines)
+
+    def _diagnostics_errors(self, diagnostics: "AdapterDiagnostics") -> str:
+        if not diagnostics.parse_errors:
+            return "## Parse Failures\n\n_None — all files parsed cleanly._"
+        lines = [f"## Parse Failures ({len(diagnostics.parse_errors)})", ""]
+        for e in diagnostics.parse_errors[:20]:
+            lines.append(f"- {e}")
+        if len(diagnostics.parse_errors) > 20:
+            lines.append(f"- … and {len(diagnostics.parse_errors) - 20} more")
+        return "\n".join(lines)
+
+    def _diagnostics_lifecycle(self, supplementary: "Optional[dict]") -> str:
+        if not supplementary:
             return ""
-        lines = ["## Observations", ""]
-        for obs in result.observations:
-            lines.append(f"- {obs}")
+        lc = supplementary.get("lifecycle_summary", {})
+        if not lc:
+            return ""
+        total = lc.get("total_signals", "?")
+        by_status = lc.get("by_status", {})
+        lines = ["## Signal Lifecycle Summary", "", f"- **Total signals:** {total}"]
+        for status, cnt in sorted(by_status.items()):
+            lines.append(f"- **{status}:** {cnt}")
         return "\n".join(lines)
 
     def _adapter_diagnostics(self, diagnostics: "Optional[AdapterDiagnostics]") -> str:

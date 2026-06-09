@@ -1,35 +1,32 @@
 # NovaTacticBot — Savegame
 
-**Session:** 2026-06-09  
-**Milestone:** Phase 2 — Real Data Connection — COMPLETE  
+**Session:** 2026-06-09 (Phase 2 completion)  
+**Milestone:** Phase 2 — Real Data Integration — COMPLETE  
 
 ---
 
 ## Session Summary
 
-Connected NovaTacticBot to the real NovaBotV2Options repository in a strictly
-read-only manner. Generated first real intelligence report.
+Extended NovaTacticBot Phase 2 to full completion: v2 analytics, separate diagnostics
+report, source inventory, additional data source support, expanded test coverage.
 
-### Key Decisions
+### Key Decisions (this session)
 
-1. **Two-adapter strategy**: `NovaBotV2OptionsAdapter` for real directory structure; existing `OptionsAdapter` retained for generic JSON/CSV/log files.
-2. **Primary source: decision_audit_trail.jsonl** — richest data with regime, score, risk_reward, and decision context.
-3. **PnL cross-reference**: recommendation_accuracy.json cross-referenced to attach realized_pnl/outcome to accepted signals.
-4. **TRADE_OUTCOME vs RECOMMENDATION**: ACCEPTED + realized_pnl present → TRADE_OUTCOME; ACCEPTED + no PnL yet → RECOMMENDATION (PENDING).
-5. **Chain rejection deduplication**: options_events.jsonl has 356 repeat log lines for the same contract; deduplicated to 1 unique contract.
-6. **SIDEWAYS → NORMAL**: NovaBotV2Options uses SIDEWAYS; mapped to NORMAL in universal contract.
-7. **`--warn-broker-env` flag**: Development override for machines with ib_insync installed. Logs a prominent WARNING but does not block the run.
-8. **AdapterDiagnostics**: Each load records files found/missing, records skipped, schema mismatches, parse errors.
+1. **Analytics Engine v2**: Added three new passes — symbol concentration, confidence distribution, candidate ranking. All pure analytics, no writes.
+2. **Separate diagnostics file**: `adapter_diagnostics.md` now generated independently from `tacticbot_report.md`, making it easier to share diagnostic data without the full report.
+3. **`decision_audit_summary.json` as fallback**: Adapter now reads summary JSON when JSONL is absent (same records, different format). JSONL takes priority to avoid duplicates.
+4. **`signal_lifecycle_summary.json`**: Loaded as supplementary data; lifecycle counts appear in diagnostics report.
+5. **Source inventory**: `data/reports/source_inventory.md` documents all discovered files, their schemas, and mapping decisions.
+6. **Composite candidate ranking**: `composite_score = avg_score × win_rate`. For candidates without completed trades, win_rate defaults to 0.5 as neutral prior.
 
-### Real Data Findings
+### Real Data Findings (Phase 2)
 
-- 17 audit trail records loaded (16 sig-xxx + 1 s99 test record)
-- 356 chain rejection log lines → deduplicated to 1 unique AAPL contract
-- 5 paper trades have realized PnL in recommendation_accuracy.json
-- LONG_CALL: 100% win rate (2/2), avg PnL $123.80
-- CASH_SECURED_PUT: 33% win rate (1/3), avg PnL -$23.05
-- Rejection rate: 100% of actionable signals (all recommendations either rejected or awaiting outcome)
-- Open question: many PENDING outcomes (61% missing) — recommend cross-referencing with paper_positions data in future phases
+- 18 total events: 17 from audit_trail + 1 chain rejection
+- Symbols: AAPL (2), SPY (2), MSFT (2), TSLA (2), QQQ (1) + chain_filter
+- Confidence distribution: most events score 0.5–0.8 range
+- Top candidate: AAPL/LONG_CALL (composite 0.82 × 1.0 = 0.82)
+- Rejection rate: 69% — BUDGET_EXCEEDED and LOW_SCORE are dominant rejection codes
+- `signal_lifecycle_summary.json` reports 15 total signals, 5 PAPER_EXIT, 10 RECOMMENDED
 
 ---
 
@@ -37,18 +34,16 @@ read-only manner. Generated first real intelligence report.
 
 ```
 CREATED:
-  adapters/nova_options_adapter.py
-  tests/test_nova_options_adapter.py
-  tests/fixtures/nova_options/data/logs/decision_audit_trail.jsonl
-  tests/fixtures/nova_options/data/logs/options_events.jsonl
-  tests/fixtures/nova_options/data/reports/recommendation_accuracy.json
-  tests/fixtures/nova_options/data/reports/strategy_performance.json
-  tests/fixtures/nova_options/data/reports/regime_performance.json
-  data/reports/tacticbot_report.md   (first real report)
+  tests/test_analytics_engine_v2.py        (21 new tests)
+  data/reports/adapter_diagnostics.md      (standalone diagnostics)
+  data/reports/source_inventory.md         (source discovery + schemas)
 
 MODIFIED:
-  utils/tactic_report_generator.py   (diagnostics + supplementary sections)
-  tools/run_tacticbot.py             (--nova-options-dir, --warn-broker-env)
+  core/tactic_analytics_engine.py          (v2: symbol concentration, confidence distribution, candidate ranking)
+  adapters/nova_options_adapter.py         (decision_audit_summary.json + signal_lifecycle_summary.json loaders)
+  utils/tactic_report_generator.py         (new sections + separate diagnostics file generation)
+  tools/run_tacticbot.py                   (lifecycle_summary in supplementary, diagnostics_path)
+  tests/test_nova_options_adapter.py       (updated to test separate diagnostics file)
   CURRENT_STATE.md
   savegame.md
   task_queue.json
@@ -60,16 +55,16 @@ MODIFIED:
 
 Next session should:
 
-1. Run tests: `python -m pytest tests/ -v`
-2. Decide next phase: Multi-Bot Support (adapters for NovaBotV2, MarketRegimeBot, etc.) or Bias Detection
-3. For bias detection, add `options_paper_positions.py` data as a source for open positions
-4. Check if `data/reports/signal_lifecycle_summary.json` can enrich the event timeline
+1. Run tests: `python -m pytest tests/ -v` (expect 99 passing)
+2. Decide next phase: Multi-Bot Support or Bias Detection
+3. For multi-bot: start with NovaBotV2 adapter (check `C:\NovaGPT\Apps\NovaBotV2\data\` structure)
+4. For bias detection: use existing regime/strategy/score data to detect over-trading patterns
 
 ---
 
 ## Open Items
 
-- [ ] Cross-reference paper positions for open paper trades (get realized PnL when they close)
-- [ ] The "s99" test record in audit trail has no cycle_id — decide if test records should be filtered
-- [ ] Consider reading `data/reports/paper_trade_outcomes.md` for additional context
-- [ ] Plan virtualenv separation so ib_insync guardrail doesn't fire in normal development
+- [ ] "s99" test record in audit trail has no cycle_id — consider filtering test artifacts
+- [ ] Cross-reference paper positions for open paper trades
+- [ ] Plan virtualenv separation so ib_insync guardrail doesn't fire in development
+- [ ] Consider XLSX parser for `data/novabot_options.xlsx`
