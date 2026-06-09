@@ -125,6 +125,35 @@ class ConfidenceDistribution:
 
 
 @dataclass
+class RollingWinRateWindow:
+    """Win rate over the last N trade-outcome events (all strategies combined)."""
+    window: int          # e.g. 10, 30, 100
+    trades: int          # actual trades included (may be < window if fewer events)
+    wins: int
+    win_rate: Optional[float] = None
+
+    def finalize(self) -> None:
+        if self.trades > 0:
+            self.win_rate = self.wins / self.trades
+
+
+@dataclass
+class RollingWinRates:
+    """Rolling win rates over last-10, last-30, last-100 trade outcomes."""
+    last_10: RollingWinRateWindow = field(
+        default_factory=lambda: RollingWinRateWindow(window=10, trades=0, wins=0)
+    )
+    last_30: RollingWinRateWindow = field(
+        default_factory=lambda: RollingWinRateWindow(window=30, trades=0, wins=0)
+    )
+    last_100: RollingWinRateWindow = field(
+        default_factory=lambda: RollingWinRateWindow(window=100, trades=0, wins=0)
+    )
+    # Per-strategy rolling windows (last-10 only — most actionable)
+    by_strategy_last_10: dict[str, RollingWinRateWindow] = field(default_factory=dict)
+
+
+@dataclass
 class CandidateRanking:
     """Ranked list of symbols by composite desirability score."""
 
@@ -151,6 +180,7 @@ class AnalyticsResult:
     symbol_concentration: SymbolConcentration = field(default_factory=SymbolConcentration)
     confidence_distribution: ConfidenceDistribution = field(default_factory=ConfidenceDistribution)
     candidate_ranking: CandidateRanking = field(default_factory=CandidateRanking)
+    rolling_win_rates: RollingWinRates = field(default_factory=RollingWinRates)
     open_questions: list[str] = field(default_factory=list)
     observations: list[str] = field(default_factory=list)
 
@@ -178,6 +208,7 @@ class TacticAnalyticsEngine:
         self._symbol_concentration(events, result)
         self._confidence_distribution(events, result)
         self._candidate_ranking(events, result)
+        self._rolling_win_rates(events, result)
         self._generate_observations(result)
 
         return result
@@ -407,6 +438,40 @@ class TacticAnalyticsEngine:
 
         candidates.sort(key=lambda c: -c.composite_score)
         result.candidate_ranking.candidates = candidates
+
+    def _rolling_win_rates(self, events: list[TacticalEvent], result: AnalyticsResult) -> None:
+        """Compute rolling win rates over last-10, last-30, last-100 trade outcomes."""
+        # Only TRADE_OUTCOME events with a known outcome contribute
+        outcomes = [
+            e for e in events
+            if e.event_type == EventType.TRADE_OUTCOME
+            and e.outcome in (Outcome.WIN, Outcome.LOSS, Outcome.BREAKEVEN)
+        ]
+        # Sort by timestamp ascending so the last N are the most recent
+        outcomes.sort(key=lambda e: e.timestamp)
+
+        def _compute_window(n: int) -> RollingWinRateWindow:
+            window_events = outcomes[-n:] if len(outcomes) >= n else outcomes
+            wins = sum(1 for e in window_events if e.outcome == Outcome.WIN)
+            w = RollingWinRateWindow(window=n, trades=len(window_events), wins=wins)
+            w.finalize()
+            return w
+
+        result.rolling_win_rates.last_10 = _compute_window(10)
+        result.rolling_win_rates.last_30 = _compute_window(30)
+        result.rolling_win_rates.last_100 = _compute_window(100)
+
+        # Per-strategy last-10
+        strategies: dict[str, list[TacticalEvent]] = defaultdict(list)
+        for e in outcomes:
+            strategies[e.strategy_id].append(e)
+
+        for sid, strat_events in strategies.items():
+            last_10 = strat_events[-10:]
+            wins = sum(1 for e in last_10 if e.outcome == Outcome.WIN)
+            w = RollingWinRateWindow(window=10, trades=len(last_10), wins=wins)
+            w.finalize()
+            result.rolling_win_rates.by_strategy_last_10[sid] = w
 
     def _generate_observations(self, result: AnalyticsResult) -> None:
         obs = result.observations

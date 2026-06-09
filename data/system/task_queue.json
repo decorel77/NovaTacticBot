@@ -471,7 +471,7 @@
     "title": "Rolling-window win-rate tracker",
     "phase": "PHASE_4",
     "phase_name": "Historical Analytics",
-    "status": "TODO",
+    "status": "DONE",
     "priority": "P1",
     "risk": "LOW",
     "task_type": "analytics",
