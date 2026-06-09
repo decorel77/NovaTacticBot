@@ -2,6 +2,7 @@
   "bot": "NovaTacticBot",
   "version": "2.0",
   "last_updated": "2026-06-09",
+  "_notice": "LEGACY FILE — superseded by data/system/task_queue.json (100 tasks, NOVA standard format). This file is kept for historical reference only.",
   "phases": [
     {
       "phase_id": "FOUNDATION",
