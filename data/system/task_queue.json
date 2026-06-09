@@ -633,7 +633,7 @@
     "title": "Strategy edge erosion detector",
     "phase": "PHASE_5",
     "phase_name": "Strategy Analytics",
-    "status": "TODO",
+    "status": "DONE",
     "priority": "P1",
     "risk": "LOW",
     "task_type": "analytics",
@@ -1810,5 +1810,6 @@
     "live_trading_readiness": "not_applicable"
   }
 ]
+
 
 

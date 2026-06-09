@@ -181,6 +181,22 @@ class StrategyStreakStats:
 
 
 LOSS_STREAK_FLAG_THRESHOLD = 3
+EDGE_EROSION_THRESHOLD_PP = 0.10   # 10 percentage points below baseline triggers warning
+
+
+@dataclass
+class EdgeErosionWarning:
+    strategy_id: str
+    baseline_win_rate: float        # overall historical win rate for this strategy
+    rolling_win_rate: float         # current rolling-last-10 win rate
+    drop_pp: float                  # baseline - rolling (in percentage points, positive = drop)
+
+
+@dataclass
+class EdgeErosionAnalysis:
+    """Flags strategies whose recent win rate has eroded significantly vs their baseline."""
+    warnings: list[EdgeErosionWarning] = field(default_factory=list)
+    healthy_strategies: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -202,6 +218,7 @@ class AnalyticsResult:
     candidate_ranking: CandidateRanking = field(default_factory=CandidateRanking)
     rolling_win_rates: RollingWinRates = field(default_factory=RollingWinRates)
     streak_analysis: StreakAnalysis = field(default_factory=StreakAnalysis)
+    edge_erosion: EdgeErosionAnalysis = field(default_factory=EdgeErosionAnalysis)
     open_questions: list[str] = field(default_factory=list)
     observations: list[str] = field(default_factory=list)
 
@@ -231,6 +248,7 @@ class TacticAnalyticsEngine:
         self._candidate_ranking(events, result)
         self._rolling_win_rates(events, result)
         self._streak_analysis(events, result)
+        self._edge_erosion_analysis(result)
         self._generate_observations(result)
 
         return result
@@ -495,6 +513,38 @@ class TacticAnalyticsEngine:
             w.finalize()
             result.rolling_win_rates.by_strategy_last_10[sid] = w
 
+    def _edge_erosion_analysis(self, result: AnalyticsResult) -> None:
+        """Compare per-strategy rolling last-10 win rate against overall baseline.
+
+        Flags EDGE_EROSION_WARNING when rolling rate is >= EDGE_EROSION_THRESHOLD_PP
+        below the strategy's overall historical win rate.
+        """
+        ea = result.edge_erosion
+        rolling_by_strat = result.rolling_win_rates.by_strategy_last_10
+
+        for sid, s_stats in result.strategy_stats.items():
+            baseline = s_stats.win_rate
+            if baseline is None or sid not in rolling_by_strat:
+                continue
+
+            rolling_window = rolling_by_strat[sid]
+            if rolling_window.win_rate is None or rolling_window.trades < 3:
+                # Too few trades in rolling window — skip
+                continue
+
+            rolling = rolling_window.win_rate
+            drop = baseline - rolling
+
+            if drop >= EDGE_EROSION_THRESHOLD_PP:
+                ea.warnings.append(EdgeErosionWarning(
+                    strategy_id=sid,
+                    baseline_win_rate=baseline,
+                    rolling_win_rate=rolling,
+                    drop_pp=drop,
+                ))
+            else:
+                ea.healthy_strategies.append(sid)
+
     def _streak_analysis(self, events: list[TacticalEvent], result: AnalyticsResult) -> None:
         """Detect consecutive win/loss streaks per strategy. Flag loss streaks >= threshold."""
         from collections import defaultdict
@@ -572,6 +622,12 @@ class TacticAnalyticsEngine:
             oq.append(
                 "High-score recommendations have a lower win rate than low-score recommendations. "
                 "Score calibration may need review."
+            )
+
+        for w in result.edge_erosion.warnings:
+            obs.append(
+                f"EDGE_EROSION_WARNING: Strategy '{w.strategy_id}' rolling win rate "
+                f"{w.rolling_win_rate:.0%} is {w.drop_pp:.0%} below baseline {w.baseline_win_rate:.0%}."
             )
 
         for sid in result.streak_analysis.flagged_strategies:
