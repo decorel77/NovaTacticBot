@@ -43,6 +43,7 @@
 - `utils/adapter_error_logger.py` — ADAPTER_ERROR JSONL logger (TACTIC-EL-003) — appends to `data/logs/tactic_adapter_errors.jsonl`
 - `utils/run_history_tracker.py` — run summary tracker (TACTIC-EL-005) — appends to `data/system/run_history.json`
 - `utils/tactic_snapshot_writer.py` — writes `data/system/result_snapshot.json` for NovaBridge (TACTIC-RP-005)
+- `utils/cross_run_trend_analyser.py` — cross-run trend analysis: win-rate shift, volume shift, strategy mix change (TACTIC-HA-005)
 
 ### Workflow
 - `workflow/tactic_html_dashboard.py` — self-contained HTML dashboard (TACTIC-DB-003) — writes `data/reports/tactic_dashboard.html`
@@ -53,7 +54,7 @@
 ### Task Queue
 - `data/system/task_queue.json` — 100 tasks across 15 phases (NOVA standard format)
 
-### Tests (184 passing)
+### Tests (205 passing)
 - `tests/test_tactic_event.py`
 - `tests/test_options_adapter.py`
 - `tests/test_analytics_engine.py`
@@ -73,6 +74,7 @@
 - `tests/test_run_history_tracker.py` — NEW (5 tests)
 - `tests/test_adapter_error_logger.py` — NEW (5 tests)
 - `tests/test_tactic_html_dashboard.py` — NEW (5 tests)
+- `tests/test_cross_run_trend_analyser.py` — NEW (21 tests)
 
 ### Reports Generated
 - `data/reports/tacticbot_report.md`
