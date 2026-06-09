@@ -1,5 +1,51 @@
 # NovaTacticBot — Savegame
 
+**Session:** 2026-06-09 (Autonomous Cycle)  
+**Milestone:** Phase 2 — COMPLETE | TACTIC-EL-001 DONE | TACTIC-HA-003 DONE  
+
+---
+
+## Session 4 — 2026-06-09 — Autonomous Cycle
+
+**Focus:** MASTER-002 (TACTIC-EL-001) and MASTER-006 (TACTIC-HA-003) from NOVA_MASTER_TASK_QUEUE.
+
+**What was done:**
+
+1. Created `utils/tactic_event_logger.py` — internal event log schema + JSONL writer (TACTIC-EL-001)
+2. Extended `core/tactic_analytics_engine.py` — rolling win-rate tracker with RollingWinRates dataclass (TACTIC-HA-003)
+3. 8 tests for event logger, 8 tests for rolling win rates — all passing
+4. Both repo task queue entries marked DONE
+
+---
+
+## Session 3 — 2026-06-09 — Task Queue Architecture Review
+
+**Focus:** NOVA ecosystem task queue audit and TacticBot task queue expansion.
+
+**What was done:**
+
+1. Created `data/system/task_queue.json` — 100 tasks in NOVA standard format across 15 phases
+2. Created `docs/novatacticbot_roadmap.md` — full canonical roadmap (14 phases + FUTURE_ECOSYSTEM)
+3. Updated `CURRENT_STATE.md` with task architecture session summary
+4. Updated `roadmap.md` to reference canonical docs
+5. Added `SAVEGAME.md` (this file) as session history authority
+6. Task queue at root (`task_queue.json`) is kept as legacy reference
+
+**Commits:** `bc125f3`
+
+**Task queue at end of session:**
+- 100 tasks total: 26 DONE, 47 TODO/PLANNED, 22 FUTURE, 5 PLANNING
+- All tasks have NOVA standard fields including `allowed_under_current_architecture`, `runtime_effect`, `broker_execution`, `live_trading_readiness`
+
+**Next steps (priority order):**
+1. PHASE_3 Event Logging (TACTIC-EL-001 to EL-003) — no dependencies
+2. PHASE_2 NovaBotV2 adapter (TACTIC-DC-004)
+3. PHASE_5 streak detection + score calibration (TACTIC-SA-003/004)
+4. PHASE_4 rolling windows + baseline (TACTIC-HA-003/004)
+5. PHASE_10 result_snapshot for NovaBridge (TACTIC-RP-005)
+
+---
+
 **Session:** 2026-06-09 (Phase 2 completion)  
 **Milestone:** Phase 2 — Real Data Integration — COMPLETE  
 
