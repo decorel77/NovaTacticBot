@@ -51,6 +51,7 @@ from utils.analytics_baseline_writer import (
 )
 from utils.tactic_run_log_writer import TacticRunLogWriter, RunLogEntry
 from utils.adapter_error_logger import AdapterErrorLogger, AdapterErrorEntry
+from utils.source_provenance import derive_run_provenance
 from workflow.tactic_html_dashboard import TacticHtmlDashboard
 
 _SYSTEM_DIR = _PROJECT_ROOT / "data" / "system"
@@ -304,13 +305,13 @@ def main() -> int:
         logger.info("Diagnostics written: %s", diag_path)
 
     # ── Step 5b: Persist run-path artifacts (REPAIR-004) ───────────────────────
-    if args.nova_options_dir:
-        input_source = "NovaBotV2Options"
-    elif args.source_dir:
-        input_source = "generic_source_dir"
-    else:
-        input_source = "none"
-    data_is_real = bool(args.nova_options_dir or args.source_dir)
+    # POST-005: data_is_real is derived from trusted adapter provenance, not from
+    # whether a source directory was passed. Generic/dummy input stays false.
+    provenance = derive_run_provenance(args.nova_options_dir, args.source_dir)
+    input_source = provenance.input_source
+    data_is_real = provenance.data_is_real
+    for reason in provenance.reasons:
+        logger.info("data_is_real provenance: %s", reason)
 
     snapshot_dict, artifact_paths = persist_run_artifacts(
         result,
