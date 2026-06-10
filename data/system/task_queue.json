@@ -1567,7 +1567,21 @@
     "allowed_under_current_architecture": false,
     "runtime_effect": false,
     "broker_execution": false,
-    "live_trading_readiness": "not_applicable"
+    "live_trading_readiness": "not_applicable",
+    "frozen": true,
+    "freeze": {
+      "frozen_at": "2026-06-10",
+      "frozen_by": "REPAIR-012",
+      "classification": "future",
+      "future_bot": "LoggingBot",
+      "dispatchable": false,
+      "executable": false,
+      "broker_access": false,
+      "live_trading": false,
+      "human_promotion_required": true,
+      "assessment_ref": "Vault/Handover/NOVA_FUTURE_BOTS_ASSESSMENT.md",
+      "promotion_note": "DO NOT BUILD YET. Promote only by deliberate human decision once the matching trigger condition in NOVA_FUTURE_BOTS_ASSESSMENT.md is met. Promotion MUST remove this freeze block and update the freeze invariant test in the same change."
+    }
   },
   {
     "id": "TACTIC-FUTURE-002",
@@ -1583,7 +1597,21 @@
     "allowed_under_current_architecture": false,
     "runtime_effect": false,
     "broker_execution": false,
-    "live_trading_readiness": "not_applicable"
+    "live_trading_readiness": "not_applicable",
+    "frozen": true,
+    "freeze": {
+      "frozen_at": "2026-06-10",
+      "frozen_by": "REPAIR-012",
+      "classification": "future",
+      "future_bot": "ResearchBot",
+      "dispatchable": false,
+      "executable": false,
+      "broker_access": false,
+      "live_trading": false,
+      "human_promotion_required": true,
+      "assessment_ref": "Vault/Handover/NOVA_FUTURE_BOTS_ASSESSMENT.md",
+      "promotion_note": "DO NOT BUILD YET. Promote only by deliberate human decision once the matching trigger condition in NOVA_FUTURE_BOTS_ASSESSMENT.md is met. Promotion MUST remove this freeze block and update the freeze invariant test in the same change."
+    }
   },
   {
     "id": "TACTIC-FUTURE-003",
@@ -1599,7 +1627,21 @@
     "allowed_under_current_architecture": false,
     "runtime_effect": false,
     "broker_execution": false,
-    "live_trading_readiness": "not_applicable"
+    "live_trading_readiness": "not_applicable",
+    "frozen": true,
+    "freeze": {
+      "frozen_at": "2026-06-10",
+      "frozen_by": "REPAIR-012",
+      "classification": "future",
+      "future_bot": "NewsBot",
+      "dispatchable": false,
+      "executable": false,
+      "broker_access": false,
+      "live_trading": false,
+      "human_promotion_required": true,
+      "assessment_ref": "Vault/Handover/NOVA_FUTURE_BOTS_ASSESSMENT.md",
+      "promotion_note": "DO NOT BUILD YET. Promote only by deliberate human decision once the matching trigger condition in NOVA_FUTURE_BOTS_ASSESSMENT.md is met. Promotion MUST remove this freeze block and update the freeze invariant test in the same change."
+    }
   },
   {
     "id": "TACTIC-FUTURE-004",
@@ -1615,7 +1657,21 @@
     "allowed_under_current_architecture": false,
     "runtime_effect": false,
     "broker_execution": false,
-    "live_trading_readiness": "not_applicable"
+    "live_trading_readiness": "not_applicable",
+    "frozen": true,
+    "freeze": {
+      "frozen_at": "2026-06-10",
+      "frozen_by": "REPAIR-012",
+      "classification": "future",
+      "future_bot": "MacroBot",
+      "dispatchable": false,
+      "executable": false,
+      "broker_access": false,
+      "live_trading": false,
+      "human_promotion_required": true,
+      "assessment_ref": "Vault/Handover/NOVA_FUTURE_BOTS_ASSESSMENT.md",
+      "promotion_note": "DO NOT BUILD YET. Promote only by deliberate human decision once the matching trigger condition in NOVA_FUTURE_BOTS_ASSESSMENT.md is met. Promotion MUST remove this freeze block and update the freeze invariant test in the same change."
+    }
   },
   {
     "id": "TACTIC-FUTURE-005",
@@ -1631,7 +1687,21 @@
     "allowed_under_current_architecture": false,
     "runtime_effect": false,
     "broker_execution": false,
-    "live_trading_readiness": "not_applicable"
+    "live_trading_readiness": "not_applicable",
+    "frozen": true,
+    "freeze": {
+      "frozen_at": "2026-06-10",
+      "frozen_by": "REPAIR-012",
+      "classification": "future",
+      "future_bot": "TaxBot",
+      "dispatchable": false,
+      "executable": false,
+      "broker_access": false,
+      "live_trading": false,
+      "human_promotion_required": true,
+      "assessment_ref": "Vault/Handover/NOVA_FUTURE_BOTS_ASSESSMENT.md",
+      "promotion_note": "DO NOT BUILD YET. Promote only by deliberate human decision once the matching trigger condition in NOVA_FUTURE_BOTS_ASSESSMENT.md is met. Promotion MUST remove this freeze block and update the freeze invariant test in the same change."
+    }
   },
   {
     "id": "TACTIC-DC-011",
