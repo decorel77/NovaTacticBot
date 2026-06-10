@@ -96,17 +96,10 @@ def parse_args() -> argparse.Namespace:
         default="tacticbot_report.md",
         help="Report file name",
     )
-    parser.add_argument(
-        "--warn-broker-env",
-        action="store_true",
-        default=False,
-        help=(
-            "DEVELOPMENT ONLY: log a WARNING instead of blocking when broker packages "
-            "are found in the environment. Use this when running on a developer machine "
-            "that also hosts NovaBotV2Options. NovaTacticBot itself still imports nothing "
-            "from broker packages. Do NOT use in production."
-        ),
-    )
+    # NOTE (REPAIR-011): the former --warn-broker-env escape hatch was removed.
+    # The broker guardrail is now HARD: if a broker package is importable the run
+    # is aborted, with no bypass. Run NovaTacticBot inside its broker-free venv
+    # (see setup_venv.ps1 / setup_venv.sh) instead of weakening the guardrail.
     return parser.parse_args()
 
 
@@ -227,19 +220,16 @@ def main() -> int:
     try:
         run_all_checks()
     except GuardrailViolation as e:
-        if args.warn_broker_env:
-            logger.warning(
-                "DEVELOPMENT MODE: broker packages found in environment but continuing "
-                "because --warn-broker-env was specified. NovaTacticBot code imports "
-                "nothing from broker packages. Violation: %s", e
-            )
-        else:
-            logger.critical("Guardrail check failed: %s", e)
-            logger.critical(
-                "If running on a developer machine with other NOVA bots installed, "
-                "use --warn-broker-env to continue with a warning instead of blocking."
-            )
-            return 1
+        # HARD guardrail (REPAIR-011): no escape hatch. NovaTacticBot is
+        # advisory-only and must run in a broker-free environment.
+        logger.critical("Guardrail check failed: %s", e)
+        logger.critical(
+            "NovaTacticBot must run in its isolated, broker-free virtualenv. "
+            "Create it with setup_venv.ps1 (or setup_venv.sh) and run this script "
+            "with that venv's interpreter. The previous --warn-broker-env bypass "
+            "was removed in REPAIR-011."
+        )
+        return 1
     except Exception as e:
         logger.critical("Guardrail check failed: %s", e)
         return 1

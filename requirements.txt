@@ -1,1 +1,16 @@
-pytest>=7.0
+# NovaTacticBot — ADVISORY-ONLY environment (REPAIR-011)
+#
+# This repo MUST run in a broker-free virtualenv. The guardrail in
+# utils/guardrails.py is HARD: run_tacticbot.py refuses to start if any broker
+# package is importable. There is no escape hatch (the former --warn-broker-env
+# flag was removed in REPAIR-011).
+#
+# NovaTacticBot source imports ONLY the Python standard library plus its own
+# packages (core/ adapters/ utils/ workflow/). Do NOT add ib-insync, ibapi,
+# alpaca, ccxt, robin_stocks, tastytrade, tda, schwab, or any other broker /
+# order-execution library here — doing so breaks the advisory guarantee.
+#
+# Create the isolated environment with:  ./setup_venv.ps1   (or setup_venv.sh)
+
+# ── Test/dev only ────────────────────────────
+pytest>=8.0,<10

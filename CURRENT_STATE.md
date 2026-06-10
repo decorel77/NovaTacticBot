@@ -105,17 +105,27 @@
 
 ---
 
-## Known Environment Issue
+## Environment Isolation (REPAIR-011)
 
-`ib_insync` is installed in the shared Python environment. Use `--warn-broker-env` on this machine.
+`ib_insync` is installed in the **shared** global interpreter, which is broker-capable.
+NovaTacticBot is advisory-only and must NOT run there. Instead it runs in its own
+**broker-free virtualenv**, built once with `setup_venv.ps1` (or `setup_venv.sh`).
+That script installs only `requirements.txt` (stdlib + pytest, no broker libs) and
+asserts no broker package is importable.
+
+The broker guardrail is now **hard** — the former `--warn-broker-env` escape hatch
+was removed. If a broker package is reachable, `run_tacticbot.py` aborts with exit 1.
 
 ---
 
 ## How to Run
 
-```bash
+```powershell
 cd C:\NovaGPT\Apps\NovaTacticBot
-python tools/run_tacticbot.py --nova-options-dir "C:\NovaGPT\Apps\NovaBotV2Options" --warn-broker-env
+# One-time: build the isolated broker-free venv
+./setup_venv.ps1
+# Run inside that venv:
+.\.venv\Scripts\python.exe tools\run_tacticbot.py --nova-options-dir "C:\NovaGPT\Apps\NovaBotV2Options"
 ```
 
 ---
