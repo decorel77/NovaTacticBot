@@ -27,6 +27,7 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
+import time
 from pathlib import Path
 
 # Ensure project root is on sys.path when running directly
@@ -40,6 +41,29 @@ from adapters.nova_options_adapter import NovaBotV2OptionsAdapter
 from core.tactic_analytics_engine import TacticAnalyticsEngine
 from core.tactic_event import TacticalEvent
 from utils.tactic_report_generator import TacticReportGenerator
+
+# Run-path artifact writers (REPAIR-004 — previously orphan modules).
+from utils.tactic_snapshot_writer import TacticSnapshotWriter, snapshot_from_result
+from utils.run_history_tracker import RunHistoryTracker, RunHistoryEntry
+from utils.analytics_baseline_writer import (
+    AnalyticsBaselineWriter,
+    snapshot_from_result as baseline_from_result,
+)
+from utils.tactic_run_log_writer import TacticRunLogWriter, RunLogEntry
+from utils.adapter_error_logger import AdapterErrorLogger, AdapterErrorEntry
+from workflow.tactic_html_dashboard import TacticHtmlDashboard
+
+_SYSTEM_DIR = _PROJECT_ROOT / "data" / "system"
+_LOGS_DIR = _PROJECT_ROOT / "data" / "logs"
+_REPORTS_DIR = _PROJECT_ROOT / "data" / "reports"
+
+# Canonical required keys (REPAIR-003 NovaBridge schema). Checked inline so the
+# runner stays decoupled from NovaBridge; the test suite runs the real validator.
+_CANONICAL_REQUIRED_KEYS = (
+    "schema_version", "producer_id", "produced_at", "fresh_until",
+    "input_source", "data_is_real", "advisory_only", "broker_execution",
+    "live_trading_active", "status", "payload",
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -86,8 +110,117 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def _check_canonical_conformance(snapshot: dict) -> list[str]:
+    """Lightweight, dependency-free canonical conformance check.
+
+    Mirrors the REPAIR-003 rejection rules for the fields this producer controls,
+    without importing NovaBridge at runtime. The test suite runs the real
+    NovaBridge validator for the authoritative check.
+    """
+    problems = []
+    for key in _CANONICAL_REQUIRED_KEYS:
+        if snapshot.get(key) is None:
+            problems.append(f"missing {key}")
+    if snapshot.get("schema_version") != "1.0":
+        problems.append("schema_version must be '1.0'")
+    if snapshot.get("data_is_real") is not True:
+        problems.append("data_is_real must be true")
+    if snapshot.get("broker_execution") is not False:
+        problems.append("broker_execution must be false")
+    if snapshot.get("live_trading_active") is not False:
+        problems.append("live_trading_active must be false")
+    return problems
+
+
+def persist_run_artifacts(
+    result,
+    events,
+    adapter_errors,
+    *,
+    input_source: str,
+    data_is_real: bool,
+    duration_seconds: float,
+    diagnostics=None,
+    system_dir: Path = _SYSTEM_DIR,
+    logs_dir: Path = _LOGS_DIR,
+    reports_dir: Path = _REPORTS_DIR,
+) -> tuple[dict, dict]:
+    """Write the six run-path artifacts from an executed analysis run.
+
+    Returns (snapshot_dict, paths). Pure file writes under data/; no broker,
+    no network. Parametrised on output dirs so tests can target a tmp dir.
+    """
+    system_dir = Path(system_dir)
+    logs_dir = Path(logs_dir)
+    reports_dir = Path(reports_dir)
+    paths: dict[str, Path] = {}
+
+    # 1. result_snapshot.json (canonical envelope per REPAIR-003).
+    snap = snapshot_from_result(result, input_source=input_source, data_is_real=data_is_real)
+    paths["result_snapshot"] = TacticSnapshotWriter(
+        system_dir / "result_snapshot.json"
+    ).write(snap)
+
+    # 2. run_history.json
+    history = RunHistoryTracker(system_dir / "run_history.json")
+    run_entry = RunHistoryEntry(
+        events_processed=len(events),
+        reports_generated=1,
+        errors=list(adapter_errors),
+    )
+    history.append(run_entry)
+    paths["run_history"] = system_dir / "run_history.json"
+
+    # 3. analytics_baseline.json
+    AnalyticsBaselineWriter(system_dir / "analytics_baseline.json").append(
+        baseline_from_result(result, run_id=run_entry.run_id)
+    )
+    paths["analytics_baseline"] = system_dir / "analytics_baseline.json"
+
+    # 4. tactic_run_log.jsonl
+    event_counts: dict[str, int] = {}
+    for ev in events:
+        et = getattr(ev, "event_type", "EVENT")
+        event_counts[et] = event_counts.get(et, 0) + 1
+    TacticRunLogWriter(logs_dir / "tactic_run_log.jsonl").write(
+        RunLogEntry(
+            run_id=run_entry.run_id,
+            sources_ingested=1 if input_source else 0,
+            event_counts=event_counts,
+            duration_seconds=round(float(duration_seconds), 4),
+            reports_generated=1,
+            warnings=list(adapter_errors),
+        )
+    )
+    paths["tactic_run_log"] = logs_dir / "tactic_run_log.jsonl"
+
+    # 5. tactic_adapter_errors.jsonl — real errors plus a per-run boundary line
+    #    so the log is non-empty and auditable even on a clean run.
+    err_logger = AdapterErrorLogger(logs_dir / "tactic_adapter_errors.jsonl")
+    for msg in adapter_errors:
+        err_logger.log(AdapterErrorEntry(
+            adapter_name="run_path", file_path="-",
+            error_type="AdapterError", error_message=str(msg),
+        ))
+    skipped = getattr(diagnostics, "records_skipped", 0) if diagnostics is not None else 0
+    err_logger.log(AdapterErrorEntry(
+        adapter_name="(run-summary)", file_path="-", error_type="NONE",
+        error_message=f"{len(adapter_errors)} adapter error(s); {skipped} record(s) skipped this run",
+        event_count_impact=0, event_type="RUN_SUMMARY",
+    ))
+    paths["tactic_adapter_errors"] = logs_dir / "tactic_adapter_errors.jsonl"
+
+    # 6. tactic_dashboard.html
+    paths["tactic_dashboard"] = TacticHtmlDashboard(
+        reports_dir / "tactic_dashboard.html"
+    ).write(result)
+
+    return snap.to_dict(), paths
+
+
 def main() -> int:
     args = parse_args()
+    _run_started = time.monotonic()
 
     # ── Step 1: Guardrails ─────────────────────────────────────────────────────
     logger.info("=== NovaTacticBot starting — ADVISORY ONLY MODE ===")
@@ -179,6 +312,36 @@ def main() -> int:
     logger.info("Report written: %s", written_path)
     if diagnostics is not None:
         logger.info("Diagnostics written: %s", diag_path)
+
+    # ── Step 5b: Persist run-path artifacts (REPAIR-004) ───────────────────────
+    if args.nova_options_dir:
+        input_source = "NovaBotV2Options"
+    elif args.source_dir:
+        input_source = "generic_source_dir"
+    else:
+        input_source = "none"
+    data_is_real = bool(args.nova_options_dir or args.source_dir)
+
+    snapshot_dict, artifact_paths = persist_run_artifacts(
+        result,
+        events,
+        adapter_errors,
+        input_source=input_source,
+        data_is_real=data_is_real,
+        duration_seconds=time.monotonic() - _run_started,
+        diagnostics=diagnostics,
+    )
+    for name, path in artifact_paths.items():
+        logger.info("Artifact written: %-22s %s", name, path)
+
+    conformance = _check_canonical_conformance(snapshot_dict)
+    if data_is_real and not conformance:
+        logger.info("result_snapshot conforms to the REPAIR-003 canonical schema (1.0)")
+    elif conformance:
+        logger.warning(
+            "result_snapshot is not canonical (expected for a no-source/empty run): %s",
+            conformance,
+        )
 
     # ── Step 6: Summary ────────────────────────────────────────────────────────
     logger.info("=== NovaTacticBot run complete ===")

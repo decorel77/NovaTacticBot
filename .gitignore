@@ -7,4 +7,6 @@ __pycache__/
 dist/
 build/
 data/reports/*.md
+data/reports/*.html
 data/system/*.json
+data/logs/*.jsonl

@@ -4,7 +4,7 @@ TacticBot result snapshot writer.
 Writes data/system/result_snapshot.json after each analysis run so that
 NovaBridge can observe TacticBot state via its adapter.
 
-Fields:
+Native fields:
   phase                       — str ("ANALYTICS")
   status                      — str ("OK" | "EMPTY" | "ERROR")
   top_strategy                — str | null
@@ -15,13 +15,19 @@ Fields:
   recommendation_quality_score — float | null
   schema_version              — "1.0"
 
+Canonical envelope (REPAIR-003 — NovaBridge result_snapshot schema 1.0):
+  producer_id, produced_at, fresh_until, input_source, data_is_real,
+  advisory_only, broker_execution, live_trading_active, payload.
+The snapshot validates against NovaBridge utils/snapshot_schema_validator.py so
+the Bridge and downstream advisory consumers can trust it.
+
 ADVISORY_ONLY. No broker imports. Writes to data/system/ only.
 """
 from __future__ import annotations
 
 import json
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -48,12 +54,37 @@ class TacticSnapshot:
     recommendation_quality_score: Optional[float] = None
     schema_version: str = SCHEMA_VERSION
 
+    # --- Canonical result_snapshot envelope (REPAIR-003) ---
+    producer_id: str = "NovaTacticBot"
+    produced_at: str = field(
+        default_factory=lambda: datetime.now(timezone.utc).isoformat()
+    )
+    fresh_until: str = field(
+        default_factory=lambda: (
+            datetime.now(timezone.utc) + timedelta(hours=24)
+        ).isoformat()
+    )
+    input_source: str = "NovaBotV2Options"
+    data_is_real: bool = True
+    advisory_only: bool = True
+    broker_execution: bool = False
+    live_trading_active: bool = False
+    payload: dict = field(default_factory=dict)
+
     def to_dict(self) -> dict:
         return asdict(self)
 
 
-def snapshot_from_result(result: AnalyticsResult) -> TacticSnapshot:
-    """Build a TacticSnapshot from an AnalyticsResult."""
+def snapshot_from_result(
+    result: AnalyticsResult,
+    input_source: str = "NovaBotV2Options",
+    data_is_real: bool = True,
+) -> TacticSnapshot:
+    """Build a TacticSnapshot from an AnalyticsResult.
+
+    ``input_source`` / ``data_is_real`` describe the origin of the events so the
+    canonical envelope is truthful (a fixture/empty source must say so).
+    """
     event_count = result.data_quality.total_events
     status = "EMPTY" if event_count == 0 else "OK"
 
@@ -76,6 +107,17 @@ def snapshot_from_result(result: AnalyticsResult) -> TacticSnapshot:
     edge_erosion_warnings = [w.strategy_id for w in result.edge_erosion.warnings]
     rq_score = result.recommendation_quality.avg_score
 
+    now = datetime.now(timezone.utc)
+    payload = {
+        "top_strategy": top_strategy,
+        "top_regime_fit": top_regime_fit,
+        "event_count": event_count,
+        "strategy_count": len(result.strategy_stats),
+        "regime_count": len(result.regime_stats),
+        "edge_erosion_warnings": edge_erosion_warnings,
+        "recommendation_quality_score": rq_score,
+    }
+
     return TacticSnapshot(
         status=status,
         top_strategy=top_strategy,
@@ -83,6 +125,12 @@ def snapshot_from_result(result: AnalyticsResult) -> TacticSnapshot:
         event_count=event_count,
         edge_erosion_warnings=edge_erosion_warnings,
         recommendation_quality_score=rq_score,
+        produced_at=now.isoformat(),
+        last_run_timestamp=now.isoformat(),
+        fresh_until=(now + timedelta(hours=24)).isoformat(),
+        input_source=input_source,
+        data_is_real=data_is_real,
+        payload=payload,
     )
 
 
