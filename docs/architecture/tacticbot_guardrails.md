@@ -102,11 +102,24 @@ It does **nothing else**.
 
 ## Enforcement
 
-Guardrail compliance is enforced by:
+Guardrail compliance is enforced at two levels:
 
-1. **Import-level**: Banned imports are listed in `utils/guardrails.py`. The module raises `ImportError` on startup if banned packages are present.
-2. **Code review**: All contributions must pass a guardrail review verifying no execution paths exist.
-3. **Test suite**: `tests/test_readonly_behavior.py` verifies no execution-related modules are importable from TacticBot code paths.
+1. **Runtime package guardrail**: broker-capable packages listed in
+   `utils/guardrails.py` are checked at startup by `run_all_checks()`. If any
+   banned broker package is importable in the active interpreter, startup raises
+   `GuardrailViolation`.
+2. **Source-scan test guardrail**: standard-library execution/network modules
+   listed in `utils/guardrails.py` under `_BANNED_MODULES` are enforced by
+   `tests/test_readonly_behavior.py`. The test parses production source with
+   Python AST and fails if production code imports banned modules such as
+   `socket`, `subprocess`, `ftplib`, `smtplib`, or `imaplib`, or calls
+   `os.system(...)`.
+3. **Code review**: all contributions must pass guardrail review verifying no
+   execution paths exist.
+
+The banned module list is not a runtime import hook. It is a test-enforced
+source policy. Tests may import utilities such as `subprocess` to verify
+behavior; production source may not.
 
 ---
 
