@@ -6,15 +6,19 @@ and converts the regime classification into a TacticalEvent of type REGIME_CHANG
 
 Fields consumed:
   market_regime, confidence, risk_level, volatility_env,
-  input_source, generated_at, reason, dry_run
+  input_source, produced_at, generated_at, data_is_real, reason, dry_run
 
 Mapping to TacticalEvent contract v1.0:
   source_bot    = SourceBot.MARKET_REGIME_BOT
   event_type    = EventType.REGIME_CHANGE
   strategy_id   = "regime_{market_regime.lower()}"
   regime        = market_regime (via Regime.* constants)
-  score         = confidence / 100.0
+  score         = confidence / 100.0 when real and fresh; otherwise 0.0
   metadata      = all export fields for downstream analytics
+
+QA-009 behavior: unverified, undated, unparseable, or stale regime payloads still
+emit a diagnostic event, but with score=0.0 and metadata["unverified_regime"] =
+true so they cannot carry full-weight analytics influence.
 
 Falls closed: any missing file, bad schema, or parse error → empty list.
 No broker imports. No writes. ADVISORY_ONLY.
@@ -23,6 +27,7 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional
 
@@ -39,6 +44,7 @@ _SNAPSHOT_FILE = "result_snapshot.json"  # fallback if export not present
 
 MAX_EXPORT_BYTES = 65536
 EXPECTED_SCHEMA_VERSION = "regime_export.v1"
+REGIME_FRESHNESS_HOURS = 24
 
 # Valid market_regime values from regime_export schema
 _VALID_REGIMES = frozenset({
@@ -76,9 +82,11 @@ class MarketRegimeBotAdapter(BaseAdapter):
         source_dir: Optional[str | Path] = None,
         *,
         allowed_dirs: Optional[frozenset] = None,
+        now: datetime | None = None,
     ) -> None:
         super().__init__(source_dir or DEFAULT_SOURCE_DIR)
         self._allowed_dirs = allowed_dirs if allowed_dirs is not None else ALLOWED_SOURCE_DIRS
+        self._now = now
 
     def _load_from_source(self) -> None:
         resolved_dir = self.source_dir.resolve()
@@ -178,7 +186,9 @@ class MarketRegimeBotAdapter(BaseAdapter):
             "volatility_env": payload.get("volatility_env", "UNKNOWN"),
             "input_source": payload.get("input_source", "result_snapshot"),
             "reason": payload.get("reason", []),
-            "generated_at": "",
+            "generated_at": payload.get("generated_at") or payload.get("produced_at") or "",
+            "produced_at": payload.get("produced_at"),
+            "data_is_real": payload.get("data_is_real"),
         }
         event = self._event_from_export(mapped, str(snapshot_path))
         if event is not None:
@@ -199,12 +209,19 @@ class MarketRegimeBotAdapter(BaseAdapter):
         except (TypeError, ValueError):
             confidence = 0
 
-        score = round(confidence / 100.0, 4)
         risk_level = str(payload.get("risk_level") or "UNKNOWN")
         volatility_env = str(payload.get("volatility_env") or "UNKNOWN")
         input_source = str(payload.get("input_source") or "unknown")
         generated_at = str(payload.get("generated_at") or "")
+        produced_at = str(payload.get("produced_at") or "")
         reason = list(payload.get("reason") or [])
+        data_is_real = payload.get("data_is_real") is True
+        timestamp_status = _timestamp_status(produced_at or generated_at, self._now)
+        unverified_regime = not data_is_real or timestamp_status != "fresh"
+
+        # QA-009: emit diagnostics for unverified/stale regimes, but force score
+        # to 0.0 so they cannot carry full-weight analytics influence.
+        score = 0.0 if unverified_regime else round(confidence / 100.0, 4)
 
         mapped_regime = _map_regime(market_regime)
         strategy_id = f"regime_{market_regime.lower()}"
@@ -216,9 +233,13 @@ class MarketRegimeBotAdapter(BaseAdapter):
             "volatility_env": volatility_env,
             "input_source": input_source,
             "generated_at": generated_at,
+            "produced_at": produced_at,
             "reason": reason,
             "source_file": source_file,
             "dry_run": payload.get("dry_run", True),
+            "data_is_real": data_is_real,
+            "unverified_regime": unverified_regime,
+            "regime_timestamp_status": timestamp_status,
             "read_only": True,
             "report_only": True,
         }
@@ -237,3 +258,37 @@ class MarketRegimeBotAdapter(BaseAdapter):
                 f"Failed to build TacticalEvent from MarketRegimeBot export: {exc}"
             )
             return None
+
+
+def _timestamp_status(value: str, now: datetime | None = None) -> str:
+    if not value:
+        return "missing"
+
+    parsed = _parse_timestamp(value)
+    if parsed is None:
+        return "unparseable"
+
+    current = now or datetime.now(timezone.utc)
+    if current.tzinfo is None:
+        current = current.replace(tzinfo=timezone.utc)
+    else:
+        current = current.astimezone(timezone.utc)
+
+    if parsed > current:
+        return "fresh"
+    if current - parsed > timedelta(hours=REGIME_FRESHNESS_HOURS):
+        return "stale"
+    return "fresh"
+
+
+def _parse_timestamp(value: str) -> datetime | None:
+    normalized = value.strip()
+    if normalized.endswith("Z"):
+        normalized = normalized[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)

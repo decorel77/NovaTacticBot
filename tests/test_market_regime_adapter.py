@@ -6,6 +6,7 @@ allowlist enforcement, size guard, fallback to result_snapshot, and fail-closed.
 import json
 import tempfile
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 
 from adapters.market_regime_adapter import (
@@ -16,15 +17,19 @@ from adapters.market_regime_adapter import (
 from core.tactic_event import EventType, SourceBot
 
 
+NOW = datetime(2026, 6, 9, 13, 0, 0, tzinfo=timezone.utc)
+
 BULL_EXPORT = {
     "schema_version": "regime_export.v1",
     "project": "MarketRegimeBot",
     "generated_at": "2026-06-09T12:00:00Z",
+    "produced_at": "2026-06-09T12:00:00Z",
     "market_regime": "BULL",
     "confidence": 75,
     "risk_level": "NORMAL",
     "volatility_env": "LOW_VOL",
     "input_source": "yfinance",
+    "data_is_real": True,
     "reason": ["Strong positive trend"],
     "dry_run": True,
     "read_only": True,
@@ -65,7 +70,7 @@ class TestMarketRegimeBotAdapterLoadsEvent(unittest.TestCase):
         self.tmpdir = Path(tempfile.mkdtemp())
         _write(self.tmpdir, "regime_export.json", BULL_EXPORT)
         self.adapter = MarketRegimeBotAdapter(
-            self.tmpdir, allowed_dirs=_allowed_dirs_for(self.tmpdir)
+            self.tmpdir, allowed_dirs=_allowed_dirs_for(self.tmpdir), now=NOW
         )
 
     def test_loads_one_event(self):
@@ -116,9 +121,77 @@ class TestMarketRegimeBotAdapterLoadsEvent(unittest.TestCase):
         events = self.adapter.load()
         self.assertTrue(events[0].metadata["read_only"])
 
+    def test_metadata_always_includes_data_is_real(self):
+        events = self.adapter.load()
+        self.assertIn("data_is_real", events[0].metadata)
+        self.assertTrue(events[0].metadata["data_is_real"])
+
+    def test_real_fresh_payload_is_full_score(self):
+        events = self.adapter.load()
+        self.assertAlmostEqual(events[0].score, 0.75)
+        self.assertFalse(events[0].metadata["unverified_regime"])
+        self.assertEqual(events[0].metadata["regime_timestamp_status"], "fresh")
+
     def test_no_load_errors_on_valid_export(self):
         self.adapter.load()
         self.assertEqual(self.adapter.load_errors, [])
+
+
+class TestRegimeRealnessFreshness(unittest.TestCase):
+    def _event_for(self, payload: dict) -> object:
+        tmpdir = Path(tempfile.mkdtemp())
+        _write(tmpdir, "regime_export.json", payload)
+        events = MarketRegimeBotAdapter(
+            tmpdir, allowed_dirs=_allowed_dirs_for(tmpdir), now=NOW
+        ).load()
+        self.assertEqual(len(events), 1)
+        return events[0]
+
+    def test_real_stale_payload_emits_zero_score_unverified(self):
+        event = self._event_for({
+            **BULL_EXPORT,
+            "produced_at": "2026-06-08T12:00:00Z",
+            "generated_at": "2026-06-08T12:00:00Z",
+        })
+        self.assertEqual(event.score, 0.0)
+        self.assertTrue(event.metadata["data_is_real"])
+        self.assertTrue(event.metadata["unverified_regime"])
+        self.assertEqual(event.metadata["regime_timestamp_status"], "stale")
+
+    def test_fake_payload_emits_zero_score_unverified(self):
+        event = self._event_for({**BULL_EXPORT, "data_is_real": False})
+        self.assertEqual(event.score, 0.0)
+        self.assertFalse(event.metadata["data_is_real"])
+        self.assertTrue(event.metadata["unverified_regime"])
+        self.assertEqual(event.metadata["regime_timestamp_status"], "fresh")
+
+    def test_undated_payload_emits_zero_score_unverified(self):
+        payload = dict(BULL_EXPORT)
+        payload.pop("produced_at")
+        payload.pop("generated_at")
+        event = self._event_for(payload)
+        self.assertEqual(event.score, 0.0)
+        self.assertTrue(event.metadata["data_is_real"])
+        self.assertTrue(event.metadata["unverified_regime"])
+        self.assertEqual(event.metadata["regime_timestamp_status"], "missing")
+
+    def test_unparseable_timestamp_emits_zero_score_unverified(self):
+        event = self._event_for({
+            **BULL_EXPORT,
+            "produced_at": "not-a-timestamp",
+        })
+        self.assertEqual(event.score, 0.0)
+        self.assertTrue(event.metadata["data_is_real"])
+        self.assertTrue(event.metadata["unverified_regime"])
+        self.assertEqual(event.metadata["regime_timestamp_status"], "unparseable")
+
+    def test_generated_at_used_when_produced_at_absent(self):
+        payload = dict(BULL_EXPORT)
+        payload.pop("produced_at")
+        event = self._event_for(payload)
+        self.assertAlmostEqual(event.score, 0.75)
+        self.assertFalse(event.metadata["unverified_regime"])
+        self.assertEqual(event.metadata["regime_timestamp_status"], "fresh")
 
 
 class TestRegimeMapping(unittest.TestCase):
@@ -128,7 +201,7 @@ class TestRegimeMapping(unittest.TestCase):
                   "risk_level": risk, "volatility_env": vol, "confidence": conf}
         _write(tmpdir, "regime_export.json", export)
         return MarketRegimeBotAdapter(
-            tmpdir, allowed_dirs=_allowed_dirs_for(tmpdir)
+            tmpdir, allowed_dirs=_allowed_dirs_for(tmpdir), now=NOW
         ).load()
 
     def test_bull_maps_to_bull(self):
@@ -157,7 +230,7 @@ class TestLegacySnapshotFallback(unittest.TestCase):
         tmpdir = Path(tempfile.mkdtemp())
         _write(tmpdir, "result_snapshot.json", LEGACY_SNAPSHOT)
         adapter = MarketRegimeBotAdapter(
-            tmpdir, allowed_dirs=_allowed_dirs_for(tmpdir)
+            tmpdir, allowed_dirs=_allowed_dirs_for(tmpdir), now=NOW
         )
         events = adapter.load()
         self.assertEqual(len(events), 1)
@@ -168,7 +241,7 @@ class TestLegacySnapshotFallback(unittest.TestCase):
         _write(tmpdir, "regime_export.json", BULL_EXPORT)
         _write(tmpdir, "result_snapshot.json", LEGACY_SNAPSHOT)
         adapter = MarketRegimeBotAdapter(
-            tmpdir, allowed_dirs=_allowed_dirs_for(tmpdir)
+            tmpdir, allowed_dirs=_allowed_dirs_for(tmpdir), now=NOW
         )
         events = adapter.load()
         self.assertEqual(events[0].metadata["market_regime"], "BULL")
@@ -178,7 +251,7 @@ class TestFailClosed(unittest.TestCase):
     def test_missing_files_returns_empty(self):
         tmpdir = Path(tempfile.mkdtemp())
         adapter = MarketRegimeBotAdapter(
-            tmpdir, allowed_dirs=_allowed_dirs_for(tmpdir)
+            tmpdir, allowed_dirs=_allowed_dirs_for(tmpdir), now=NOW
         )
         events = adapter.load()
         self.assertEqual(events, [])
@@ -188,7 +261,7 @@ class TestFailClosed(unittest.TestCase):
         tmpdir = Path(tempfile.mkdtemp())
         (tmpdir / "regime_export.json").write_text("not json }", encoding="utf-8")
         adapter = MarketRegimeBotAdapter(
-            tmpdir, allowed_dirs=_allowed_dirs_for(tmpdir)
+            tmpdir, allowed_dirs=_allowed_dirs_for(tmpdir), now=NOW
         )
         events = adapter.load()
         self.assertEqual(events, [])
