@@ -12,3 +12,7 @@ data/reports/*.md
 data/reports/*.html
 data/system/*.json
 data/logs/*.jsonl
+
+# Nova security: local secrets and generated junk — DO NOT COMMIT
+.env.*
+*key*.json
