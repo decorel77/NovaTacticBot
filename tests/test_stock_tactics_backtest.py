@@ -227,6 +227,118 @@ class SignalHandlingTests(unittest.TestCase):
         self.assertTrue(any("!= series symbol" in s for s in report.skipped))
 
 
+class SetupLabelTests(unittest.TestCase):
+    """NEXT-015 follow-up: per-setup / strategy labels with fail-closed UNKNOWN."""
+
+    def setUp(self):
+        bars, signals, symbol, _ = _load("sample_setups.json")
+        self.report = run_backtest(
+            bars, signals, BacktestConfig(holding_period_days=2), symbol=symbol
+        )
+
+    def test_known_labels_are_assigned_and_normalized(self):
+        self.assertEqual(4, len(self.report.trades))
+        labels = [t.setup_type for t in self.report.trades]
+        # Two explicit TREND_PULLBACK, one lowercase rsi_cross_up normalized
+        # to uppercase, and one unlabeled signal failing closed to UNKNOWN.
+        self.assertEqual(
+            ["TREND_PULLBACK", "TREND_PULLBACK", "RSI_CROSS_UP", "UNKNOWN"], labels
+        )
+        self.assertEqual((), self.report.notes)  # nothing unrecognized in fixture
+
+    def test_unrecognized_label_fails_closed_to_unknown_with_note(self):
+        bars, _, symbol, _ = _load("sample_setups.json")
+        report = run_backtest(
+            bars,
+            [bt.TacticSignal("2024-05-01", "SET", setup_type="MYSTERY_SETUP")],
+            BacktestConfig(holding_period_days=2),
+            symbol=symbol,
+        )
+        self.assertEqual(1, len(report.trades))
+        self.assertEqual("UNKNOWN", report.trades[0].setup_type)
+        self.assertEqual(["UNKNOWN"], list(report.summary_by_setup))
+        self.assertTrue(any("MYSTERY_SETUP" in n and "UNKNOWN" in n for n in report.notes))
+
+    def test_normalize_setup_label_table(self):
+        cases = [
+            ("TREND_PULLBACK", ("TREND_PULLBACK", True)),
+            ("  breakout  ", ("BREAKOUT", True)),
+            ("oversold_rebound", ("OVERSOLD_REBOUND", True)),
+            ("TREND_CONTINUATION", ("TREND_CONTINUATION", True)),
+            ("UNKNOWN", ("UNKNOWN", True)),
+            ("", ("UNKNOWN", True)),
+            (None, ("UNKNOWN", True)),
+            ("DIP_BUY", ("UNKNOWN", False)),       # not a NovaBotV2 setup family
+            ("MYSTERY_SETUP", ("UNKNOWN", False)),
+        ]
+        for raw, expected in cases:
+            with self.subTest(raw=raw):
+                self.assertEqual(expected, bt.normalize_setup_label(raw))
+
+    def test_summary_metrics_are_grouped_per_label(self):
+        by_setup = self.report.summary_by_setup
+        self.assertEqual(["RSI_CROSS_UP", "TREND_PULLBACK", "UNKNOWN"], list(by_setup))
+
+        tp = by_setup["TREND_PULLBACK"]  # +10% win and -10% loss
+        self.assertEqual(2, tp.trades)
+        self.assertEqual(1, tp.wins)
+        self.assertEqual(1, tp.losses)
+        self.assertAlmostEqual(0.5, tp.win_rate)
+        self.assertAlmostEqual(0.0, tp.avg_return_pct)
+        self.assertAlmostEqual(-1.0, tp.cumulative_return_pct)  # 1.10 * 0.90 - 1
+        self.assertAlmostEqual(-13.636364, tp.max_drawdown_pct)
+
+        rsi = by_setup["RSI_CROSS_UP"]  # single +9% win
+        self.assertEqual(1, rsi.trades)
+        self.assertAlmostEqual(1.0, rsi.win_rate)
+        self.assertAlmostEqual(9.0, rsi.avg_return_pct)
+        self.assertAlmostEqual(9.0, rsi.expectancy_pct)
+        self.assertAlmostEqual(-1.010101, rsi.max_drawdown_pct)
+
+        unknown = by_setup["UNKNOWN"]  # single -2% loss (unlabeled signal)
+        self.assertEqual(1, unknown.trades)
+        self.assertAlmostEqual(0.0, unknown.win_rate)
+        self.assertAlmostEqual(-2.0, unknown.avg_return_pct)
+        self.assertAlmostEqual(-2.803738, unknown.max_drawdown_pct)
+
+    def test_per_label_trades_sum_to_overall_summary(self):
+        overall = self.report.summary
+        self.assertIsNotNone(overall)
+        self.assertEqual(
+            overall.trades,
+            sum(s.trades for s in self.report.summary_by_setup.values()),
+        )
+        self.assertEqual(
+            overall.wins,
+            sum(s.wins for s in self.report.summary_by_setup.values()),
+        )
+        self.assertEqual(4, overall.trades)
+        self.assertAlmostEqual(1.75, overall.avg_return_pct)  # (10 - 10 + 9 - 2) / 4
+        self.assertAlmostEqual(5.7518, overall.cumulative_return_pct)  # 1.1*0.9*1.09*0.98 - 1
+
+    def test_failed_closed_report_has_empty_setup_summary(self):
+        report = run_backtest(
+            [], [bt.TacticSignal("2024-05-01", "SET", setup_type="TREND_PULLBACK")], symbol="SET"
+        )
+        self.assertFalse(report.ok)
+        self.assertEqual({}, report.summary_by_setup)
+
+    def test_labeled_runs_are_deterministic(self):
+        bars, signals, symbol, _ = _load("sample_setups.json")
+        cfg = BacktestConfig(holding_period_days=2)
+        r1 = run_backtest(bars, signals, cfg, symbol=symbol)
+        r2 = run_backtest(bars, signals, cfg, symbol=symbol)
+        self.assertEqual(bt.report_to_dict(r1), bt.report_to_dict(r2))
+
+    def test_render_includes_per_setup_section_and_sample_size_warning(self):
+        text = bt.render_report_text(self.report)
+        self.assertIn("summary by setup (small samples are NOT evidence of edge):", text)
+        self.assertIn("TREND_PULLBACK: trades=2", text)
+        self.assertIn("RSI_CROSS_UP: trades=1", text)
+        self.assertIn("UNKNOWN: trades=1", text)
+        self.assertIn("setup=TREND_PULLBACK", text)
+
+
 class SafetyTests(unittest.TestCase):
     def test_no_broker_or_network_imports(self):
         from utils.guardrails import _BANNED_PACKAGES

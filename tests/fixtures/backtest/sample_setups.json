@@ -1,0 +1,26 @@
+{
+  "symbol": "SET",
+  "meta": {
+    "input_source": "fixture",
+    "description": "Synthetic deterministic series for per-setup label grouping. NOT real market data.",
+    "data_is_real": false
+  },
+  "bars": [
+    {"date": "2024-05-01", "open": 100, "high": 101, "low": 99, "close": 100},
+    {"date": "2024-05-02", "open": 100, "high": 106, "low": 99, "close": 104},
+    {"date": "2024-05-03", "open": 104, "high": 111, "low": 103, "close": 110},
+    {"date": "2024-05-04", "open": 110, "high": 112, "low": 104, "close": 105},
+    {"date": "2024-05-05", "open": 105, "high": 106, "low": 95, "close": 99},
+    {"date": "2024-05-06", "open": 99, "high": 104, "low": 98, "close": 103},
+    {"date": "2024-05-07", "open": 103, "high": 108, "low": 102, "close": 107.91},
+    {"date": "2024-05-08", "open": 107, "high": 109, "low": 105, "close": 106},
+    {"date": "2024-05-09", "open": 106, "high": 110, "low": 104, "close": 104.86},
+    {"date": "2024-05-10", "open": 105, "high": 107, "low": 103, "close": 106}
+  ],
+  "signals": [
+    {"signal_date": "2024-05-01", "symbol": "SET", "direction": "long", "setup_type": "TREND_PULLBACK"},
+    {"signal_date": "2024-05-03", "symbol": "SET", "direction": "long", "setup_type": "TREND_PULLBACK"},
+    {"signal_date": "2024-05-05", "symbol": "SET", "direction": "long", "setup_type": "rsi_cross_up"},
+    {"signal_date": "2024-05-07", "symbol": "SET", "direction": "long"}
+  ]
+}

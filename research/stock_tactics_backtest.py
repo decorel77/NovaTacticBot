@@ -23,6 +23,9 @@ Backtest convention (intentionally simple and explicit; see
     level is crossed. Within a bar a stop is assumed hit before a target
     (conservative).
   - max_drawdown: worst low-vs-entry excursion over the holding window.
+  - Per-setup labels: signals may carry a ``setup_type``; trades and a
+    ``summary_by_setup`` breakdown are grouped by the normalized label.
+    Unlabeled or unrecognized labels fail closed to ``UNKNOWN``.
 
 Everything is pure arithmetic over the inputs: given the same fixture it always
 produces the same numbers. No wall-clock, no randomness, no I/O during compute.
@@ -36,6 +39,38 @@ from typing import Any, Sequence
 
 RESEARCH_ONLY: bool = True
 BROKER_EXECUTION: str = "disabled"
+
+# Per-setup / strategy labels (NEXT-015 follow-up).
+#
+# The known set mirrors the labels the NovaBotV2 stock pipeline actually
+# produces: the four current `detect_setup` families
+# (utils/signal_setup_utils.py) plus BREAKOUT, which appears as the strategy
+# label in the real trade_events outcome stream. Anything else fails closed
+# to UNKNOWN — the harness never invents a setup family.
+UNKNOWN_SETUP_LABEL: str = "UNKNOWN"
+KNOWN_SETUP_LABELS: frozenset[str] = frozenset({
+    "RSI_CROSS_UP",
+    "TREND_PULLBACK",
+    "TREND_CONTINUATION",
+    "OVERSOLD_REBOUND",
+    "BREAKOUT",
+})
+
+
+def normalize_setup_label(raw: Any) -> tuple[str, bool]:
+    """Return ``(label, recognized)``, failing closed to UNKNOWN.
+
+    Missing/empty labels are treated as an *explicit* UNKNOWN (recognized=True,
+    no warning); a non-empty label outside KNOWN_SETUP_LABELS is unrecognized
+    (recognized=False) and also maps to UNKNOWN so per-setup statistics can
+    never be attributed to a setup family that does not exist.
+    """
+    text = str(raw).strip().upper() if raw is not None else ""
+    if not text or text == UNKNOWN_SETUP_LABEL:
+        return UNKNOWN_SETUP_LABEL, True
+    if text in KNOWN_SETUP_LABELS:
+        return text, True
+    return UNKNOWN_SETUP_LABEL, False
 
 
 # --------------------------------------------------------------------------- #
@@ -55,6 +90,7 @@ class TacticSignal:
     signal_date: str
     symbol: str
     direction: str = "long"  # this harness models long-only stock tactics
+    setup_type: str = UNKNOWN_SETUP_LABEL  # per-setup label; fails closed to UNKNOWN
 
 
 @dataclass(frozen=True)
@@ -68,6 +104,7 @@ class BacktestConfig:
 class TradeResult:
     signal_date: str
     symbol: str
+    setup_type: str           # normalized label; UNKNOWN when unlabeled/unrecognized
     entry_date: str
     entry_price: float
     exit_date: str
@@ -102,6 +139,7 @@ class BacktestReport:
     config: dict[str, Any]
     trades: tuple[TradeResult, ...]
     summary: BacktestSummary | None
+    summary_by_setup: dict[str, BacktestSummary] = field(default_factory=dict)  # keyed by normalized label, sorted
     skipped: tuple[str, ...] = ()       # per-signal skip reasons (non-fatal)
     errors: tuple[str, ...] = ()        # dataset-level fatal errors (fail closed)
     notes: tuple[str, ...] = field(default_factory=tuple)
@@ -152,6 +190,7 @@ def _simulate_trade(
     entry_index: int,
     signal: TacticSignal,
     config: BacktestConfig,
+    setup_label: str = UNKNOWN_SETUP_LABEL,
 ) -> TradeResult:
     entry_bar = bars[entry_index]
     entry_price = entry_bar.open
@@ -180,6 +219,7 @@ def _simulate_trade(
     return TradeResult(
         signal_date=signal.signal_date,
         symbol=signal.symbol,
+        setup_type=setup_label,
         entry_date=entry_bar.date,
         entry_price=_round(entry_price),
         exit_date=bars[exit_index].date,
@@ -213,6 +253,24 @@ def summarize(trades: Sequence[TradeResult]) -> BacktestSummary | None:
         max_drawdown_pct=_round(min(t.max_drawdown_pct for t in trades)),
         expectancy_pct=_round(avg_return),
     )
+
+
+def summarize_by_setup(trades: Sequence[TradeResult]) -> dict[str, BacktestSummary]:
+    """Group trades by normalized setup label and summarize each group.
+
+    Keys are sorted alphabetically so output is deterministic. Returns an
+    empty dict when there are no trades.
+    """
+    by_label: dict[str, list[TradeResult]] = {}
+    for trade in trades:
+        by_label.setdefault(trade.setup_type, []).append(trade)
+
+    result: dict[str, BacktestSummary] = {}
+    for label in sorted(by_label):
+        summary = summarize(by_label[label])
+        if summary is not None:
+            result[label] = summary
+    return result
 
 
 def run_backtest(
@@ -258,6 +316,7 @@ def run_backtest(
     date_to_index = {bar.date: i for i, bar in enumerate(bars)}
     trades: list[TradeResult] = []
     skipped: list[str] = []
+    notes: list[str] = []
 
     for sig in signals:
         if sig.symbol != symbol:
@@ -273,7 +332,12 @@ def run_backtest(
         if entry_index >= len(bars):
             skipped.append(f"{sig.signal_date}: no entry bar after signal (last bar)")
             continue
-        trades.append(_simulate_trade(bars, entry_index, sig, cfg))
+        setup_label, recognized = normalize_setup_label(sig.setup_type)
+        if not recognized:
+            notes.append(
+                f"{sig.signal_date}: unrecognized setup label {sig.setup_type!r} treated as {UNKNOWN_SETUP_LABEL}"
+            )
+        trades.append(_simulate_trade(bars, entry_index, sig, cfg, setup_label=setup_label))
 
     return BacktestReport(
         research_only=RESEARCH_ONLY,
@@ -284,7 +348,9 @@ def run_backtest(
         config=config_dict,
         trades=tuple(trades),
         summary=summarize(trades),
+        summary_by_setup=summarize_by_setup(trades),
         skipped=tuple(skipped),
+        notes=tuple(notes),
     )
 
 
@@ -302,7 +368,8 @@ def load_dataset(path: str | Path) -> tuple[list[PriceBar], list[TacticSignal], 
     ]
     signals = [
         TacticSignal(signal_date=str(s["signal_date"]), symbol=str(s.get("symbol", symbol)),
-                     direction=str(s.get("direction", "long")))
+                     direction=str(s.get("direction", "long")),
+                     setup_type=str(s.get("setup_type", s.get("SetupType", UNKNOWN_SETUP_LABEL))))
         for s in data.get("signals", [])
     ]
     meta = dict(data.get("meta", {}))
@@ -333,13 +400,16 @@ def render_report_text(report: BacktestReport) -> str:
     lines.append(f"trades: {len(report.trades)}")
     for t in report.trades:
         lines.append(
-            f"  {t.entry_date} {t.symbol} entry={t.entry_price} exit={t.exit_price} "
+            f"  {t.entry_date} {t.symbol} setup={t.setup_type} entry={t.entry_price} exit={t.exit_price} "
             f"({t.exit_reason}) hold={t.holding_period_days}b return={t.return_pct}% "
             f"dd={t.max_drawdown_pct}% {'WIN' if t.win else 'LOSS'}"
         )
     if report.skipped:
         lines.append("skipped signals:")
         lines.extend(f"  - {s}" for s in report.skipped)
+    if report.notes:
+        lines.append("notes:")
+        lines.extend(f"  - {n}" for n in report.notes)
     s = report.summary
     if s is not None:
         lines.extend([
@@ -350,6 +420,14 @@ def render_report_text(report: BacktestReport) -> str:
             f"  avg_holding_period_days={s.avg_holding_period_days} "
             f"max_drawdown_pct={s.max_drawdown_pct} expectancy_pct={s.expectancy_pct}",
         ])
+    if report.summary_by_setup:
+        lines.extend(["", "summary by setup (small samples are NOT evidence of edge):"])
+        for label, ls in report.summary_by_setup.items():
+            lines.append(
+                f"  {label}: trades={ls.trades} wins={ls.wins} losses={ls.losses} "
+                f"win_rate={ls.win_rate} avg_return_pct={ls.avg_return_pct} "
+                f"expectancy_pct={ls.expectancy_pct} max_drawdown_pct={ls.max_drawdown_pct}"
+            )
     return "\n".join(lines).rstrip() + "\n"
 
 

@@ -10,11 +10,35 @@ A deterministic, fixture-driven harness for evaluating simple **long-only** stoc
 tactics over daily OHLC bars. Given a price series and a list of signal dates, it
 computes per-trade outcomes and summary statistics:
 
-- signal date, symbol, entry date/price, exit date/price, exit reason,
+- signal date, symbol, setup label, entry date/price, exit date/price, exit reason,
 - holding period (bars), return %, win/loss,
 - per-trade max drawdown (worst low-vs-entry excursion),
 - summary: trade count, win rate, average return, compounded cumulative return,
-  average holding period, worst drawdown, expectancy.
+  average holding period, worst drawdown, expectancy,
+- `summary_by_setup`: the same summary metrics grouped per normalized setup
+  label (sorted keys, deterministic).
+
+## Per-setup / strategy labels (added 2026-06-12)
+
+Signals may carry an optional `setup_type` (JSON keys `setup_type` or
+`SetupType`). Labels are normalized (trim + uppercase) and validated against
+the labels the NovaBotV2 stock pipeline actually produces:
+
+| Label | Source |
+|---|---|
+| `RSI_CROSS_UP` | `detect_setup` family (NovaBotV2 `utils/signal_setup_utils.py`) |
+| `TREND_PULLBACK` | `detect_setup` family |
+| `TREND_CONTINUATION` | `detect_setup` family |
+| `OVERSOLD_REBOUND` | `detect_setup` family |
+| `BREAKOUT` | observed strategy label in the real NovaBotV2 `trade_events.jsonl` outcome stream |
+| `UNKNOWN` | fail-closed sentinel |
+
+**Fail-closed rule:** a missing/empty label is an explicit `UNKNOWN`; a
+non-empty label outside the table (e.g. `DIP_BUY`, `MYSTERY_SETUP`) also maps
+to `UNKNOWN` **and** is recorded in the report's `notes` — per-setup statistics
+can never be attributed to a setup family that does not exist. The rendered
+report prints the per-setup block with an inline warning that small samples
+are not evidence of edge.
 
 ## Backtest convention
 
@@ -97,10 +121,16 @@ Reviewed against the NEXT-015 acceptance criteria:
 
 ## Known limitations
 
-- **No per-setup / strategy labels.** `TacticSignal` carries no setup-family or
-  strategy tag, so the summary cannot break down win rate / expectancy *per
-  setup* — which the NEXT-015 acceptance ("sample sizes per setup") ultimately
-  wants. This is the main remaining gap.
+- **Per-setup labels exist, but real labeled samples do not (yet).** The
+  per-setup breakdown ("sample sizes per setup") is implemented and pinned by
+  tests, but every checked-in fixture is synthetic and the only real outcome
+  stream currently has **1 unique deduplicated trade** (NEXT-016 soak, paused
+  while `\NovaBot_Main` is disabled). Per-setup win rates on n<30 samples are
+  noise — the rendered report says so explicitly.
+- **Label provenance is declarative.** The harness trusts the `setup_type` on
+  the input signal; it does not (and cannot, offline) re-derive the setup from
+  the bars. Garbage labels fail closed to UNKNOWN, but a *wrong* known label
+  is undetectable here.
 - **Single-trade drawdown only.** `max_drawdown_pct` is per-trade max adverse
   excursion; there is no equity-curve / portfolio-level drawdown because there
   is no capital or position-sizing model.
@@ -114,14 +144,32 @@ Reviewed against the NEXT-015 acceptance criteria:
 
 ## Next research steps (offline only; no runtime wiring)
 
-1. Add an optional `setup_type`/`strategy` label to `TacticSignal` and a
-   per-label summary breakdown, so reports satisfy "sample sizes per setup".
+1. ~~Add an optional `setup_type`/`strategy` label to `TacticSignal` and a
+   per-label summary breakdown, so reports satisfy "sample sizes per setup".~~
+   ✅ DONE 2026-06-12 (this revision; see "Per-setup / strategy labels").
 2. Build a documented **real historical fixture** (clearly labelled
    `data_is_real: true`, with source and date range) and produce a first dated
-   in-sample report for the three NovaBotV2 setup families using the live
+   in-sample report for the NovaBotV2 setup families using the live
    TP/SL parameters exported from config — read-only export, no runtime import.
 3. Split that fixture into calibration vs holdout windows for an explicit
    in-sample / out-of-sample comparison (walk-forward can come later,
    aligned with NEXT-014's regime-calibration harness pattern).
 4. Only after per-setup sample sizes are ≥30 real outcomes per family should
    any conclusion feed back into tactic confidence discussions (NEXT-016 gate).
+
+## How this later feeds dashboard / TacticBot reporting
+
+The intended (NOT yet wired) consumption path, all read-only:
+
+- The per-setup labels here use the **same vocabulary** as NovaTacticBot's
+  outcome stream: `NovaBotV2TradeAdapter` already derives `strategy_id` from
+  `strategy`/`setup_type` on real trade events, so backtest setup families and
+  real-outcome setup families will be directly comparable per label.
+- Once real per-setup sample sizes pass the ≥30 deduplicated-outcomes gate
+  (NEXT-016), TacticBot's report generator (QA-016 statistical floor /
+  NEXT-020) can show backtest expectancy *next to* real expectancy per setup —
+  with the backtest column clearly marked research-only.
+- Any Bridge/dashboard surfacing would consume the JSON report
+  (`report_to_dict`, includes `summary_by_setup`) as a static research
+  artifact; the harness itself stays out of every runtime cycle, and nothing
+  in this step wires it anywhere.
