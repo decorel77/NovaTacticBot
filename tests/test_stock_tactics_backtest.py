@@ -112,6 +112,48 @@ class ExitRuleTests(unittest.TestCase):
         self.assertAlmostEqual(105.0, t.exit_price)
         self.assertAlmostEqual(5.0, t.return_pct)
 
+    def test_stop_assumed_hit_before_target_when_both_crossed_in_same_bar(self):
+        # Conservative intrabar ordering: the entry bar crosses BOTH the 5% stop
+        # (low 90 <= 95) and the 5% target (high 110 >= 105); the stop must win.
+        bars = [
+            PriceBar("2024-02-01", 100, 101, 99, 100),
+            PriceBar("2024-02-02", 100, 110, 90, 100),
+            PriceBar("2024-02-03", 100, 102, 98, 101),
+        ]
+        report = run_backtest(
+            bars,
+            [TacticSignal("2024-02-01", "X")],
+            BacktestConfig(holding_period_days=3, take_profit_pct=0.05, stop_loss_pct=0.05),
+            symbol="X",
+        )
+        t = report.trades[0]
+        self.assertEqual("stop_loss", t.exit_reason)
+        self.assertEqual("2024-02-02", t.exit_date)
+        self.assertAlmostEqual(95.0, t.exit_price)
+        self.assertAlmostEqual(-5.0, t.return_pct)
+        self.assertEqual(1, t.holding_period_days)
+
+    def test_end_of_data_exit_when_holding_period_extends_past_series(self):
+        # Uptrend fixture has 6 bars; signal on 2024-01-04 enters 2024-01-05 at
+        # the open (114). A 5-bar hold extends past the data, so the trade exits
+        # at the final close (117) and is labelled end_of_data, not holding_period.
+        bars, _, symbol, _ = _load("sample_uptrend.json")
+        report = run_backtest(
+            bars,
+            [TacticSignal("2024-01-04", "AAA")],
+            BacktestConfig(holding_period_days=5),
+            symbol=symbol,
+        )
+        t = report.trades[0]
+        self.assertEqual("end_of_data", t.exit_reason)
+        self.assertEqual("2024-01-05", t.entry_date)
+        self.assertAlmostEqual(114.0, t.entry_price)
+        self.assertEqual("2024-01-06", t.exit_date)
+        self.assertAlmostEqual(117.0, t.exit_price)
+        self.assertEqual(2, t.holding_period_days)
+        self.assertAlmostEqual(2.631579, t.return_pct)
+        self.assertAlmostEqual(-1.754386, t.max_drawdown_pct)
+
 
 class DeterminismTests(unittest.TestCase):
     def test_repeated_runs_are_identical(self):

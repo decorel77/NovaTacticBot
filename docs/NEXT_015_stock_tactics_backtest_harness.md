@@ -78,3 +78,50 @@ bars, signals, symbol, meta = load_dataset("tests/fixtures/backtest/sample_uptre
 report = run_backtest(bars, signals, BacktestConfig(holding_period_days=3), symbol=symbol)
 # report.data_is_real is False; report.broker_execution == "disabled"
 ```
+
+## Validation status (2026-06-12 review)
+
+Reviewed against the NEXT-015 acceptance criteria:
+
+- **Offline / deterministic / not runtime-wired:** confirmed. The module is
+  referenced only by its own tests and this doc — no adapter, runner, workflow,
+  or tool imports it. `SafetyTests` pins the broker/network/runtime import ban.
+- **Reported metrics:** sample size (`trades`), win rate, expectancy
+  (`expectancy_pct`, currently identical to `avg_return_pct`), compounded
+  cumulative return, average holding period, and per-trade max adverse excursion
+  (`max_drawdown_pct`, worst low-vs-entry). All pinned by exact-value tests.
+- **Test coverage:** 18 deterministic tests including exit rules (holding period,
+  stop, target, end-of-data), the conservative stop-before-target intrabar
+  assumption when both levels are crossed in one bar, determinism, five
+  fail-closed cases, signal skipping, and import-safety guardrails.
+
+## Known limitations
+
+- **No per-setup / strategy labels.** `TacticSignal` carries no setup-family or
+  strategy tag, so the summary cannot break down win rate / expectancy *per
+  setup* — which the NEXT-015 acceptance ("sample sizes per setup") ultimately
+  wants. This is the main remaining gap.
+- **Single-trade drawdown only.** `max_drawdown_pct` is per-trade max adverse
+  excursion; there is no equity-curve / portfolio-level drawdown because there
+  is no capital or position-sizing model.
+- **Idealised fills.** No slippage, commissions, partial fills, or liquidity
+  limits; stops/targets fill exactly at their level. Real results will be worse.
+- **Long-only, one symbol per series, daily bars.** Non-long signals and
+  symbol mismatches are skipped (recorded in `skipped`), never simulated.
+- **All checked-in fixtures are synthetic.** They pin the arithmetic; they say
+  nothing about live edge. Any real-data run must label its fixture as real
+  historical data explicitly and state in-sample vs out-of-sample.
+
+## Next research steps (offline only; no runtime wiring)
+
+1. Add an optional `setup_type`/`strategy` label to `TacticSignal` and a
+   per-label summary breakdown, so reports satisfy "sample sizes per setup".
+2. Build a documented **real historical fixture** (clearly labelled
+   `data_is_real: true`, with source and date range) and produce a first dated
+   in-sample report for the three NovaBotV2 setup families using the live
+   TP/SL parameters exported from config — read-only export, no runtime import.
+3. Split that fixture into calibration vs holdout windows for an explicit
+   in-sample / out-of-sample comparison (walk-forward can come later,
+   aligned with NEXT-014's regime-calibration harness pattern).
+4. Only after per-setup sample sizes are ≥30 real outcomes per family should
+   any conclusion feed back into tactic confidence discussions (NEXT-016 gate).
