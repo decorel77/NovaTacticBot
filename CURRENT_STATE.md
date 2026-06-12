@@ -6,6 +6,25 @@
 
 ---
 
+## Latest Status — 2026-06-12
+
+- NEXT-008/009 read-only NovaBotV2 stock outcome wiring is active behind
+  `--nova-botv2-dir`.
+- NEXT-016 realness/blocking preflight is cleared after Joeri manually refreshed
+  the normal NovaTacticBot runtime artifact with:
+  `.\.venv\Scripts\python.exe tools\run_tacticbot.py --nova-botv2-dir C:\NovaGPT\Apps\NovaBotV2 --report-name NEXT_016_real_outcome_runtime_refresh.md`
+- NovaBridge default ecosystem freshness panel now reports NovaTacticBot
+  `VALID` / `FRESH` / `data_is_real=true` / non-blocking.
+- Statistical confidence is still `DIAGNOSTIC_ONLY`: current unique real stock
+  outcomes = 1, required soak threshold = at least 30 deduplicated real outcomes
+  before TacticBot conclusions can be used for decisions.
+- Safety boundary unchanged: no scheduler, `.env`, live-arm, broker/order code,
+  risk/capital settings, NEXT-003 promotion, NovaBotV2 producer output, or
+  NovaBotV2 live cycle was touched. NovaBotV2 was only read from
+  `data/results/trade_events.jsonl`.
+
+---
+
 ## What Exists
 
 ### Documentation

@@ -67,6 +67,35 @@ because this sandbox could not update the normal NovaTacticBot runtime artifact:
 Therefore the wiring is verified, but the ecosystem default panel will clear only
 after a normal NovaTacticBot runtime can write its own `data/system` artifacts.
 
+### Manual normal runtime refresh
+
+Joeri manually ran the normal NovaTacticBot runtime locally with write access:
+
+`.\.venv\Scripts\python.exe tools\run_tacticbot.py --nova-botv2-dir C:\NovaGPT\Apps\NovaBotV2 --report-name NEXT_016_real_outcome_runtime_refresh.md`
+
+Observed result:
+
+- Guardrails passed.
+- Broker packages were not detected.
+- `NovaBotV2TradeAdapter` loaded 1 deduplicated event from `C:\NovaGPT\Apps\NovaBotV2\data\results`.
+- `data_is_real` provenance: trusted NovaBotV2 stock outcomes verified: 1 real deduplicated outcome event loaded.
+- Report written to `data\reports\NEXT_016_real_outcome_runtime_refresh.md`.
+- `data\system\result_snapshot.json` written.
+- Canonical schema conformance passed.
+- `ADVISORY_ONLY` remained true; no trades or modifications were made.
+
+After that refresh, NovaBridge's default ecosystem freshness panel returned `PASS`.
+NovaTacticBot is now observed by the default panel as:
+
+- Schema verdict: `VALID`
+- Freshness verdict: `FRESH`
+- `data_is_real`: `true`
+- Blocking: `no`
+- Reason: `ok`
+
+This clears the realness/blocking preflight gap for NovaTacticBot's normal
+runtime artifact. It does not clear the statistical-confidence soak requirement.
+
 ## Statistical confidence gap
 
 `data_is_real=true` is provenance-justified for the stock outcome stream, but it
@@ -88,6 +117,11 @@ Required soak threshold before using TacticBot conclusions for decisions:
 
 ## NEXT-016 status
 
-Preflight started and wiring verified. NEXT-016 is not fully complete until the
-real stream soaks to the required unique-outcome threshold and the normal
-NovaTacticBot runtime artifact is refreshed in the ecosystem panel.
+Realness/blocking preflight is cleared: NovaTacticBot can write a normal
+schema-valid, fresh, real runtime snapshot from the NovaBotV2 stock outcome
+stream and NovaBridge's default panel now passes it.
+
+NEXT-016 is still not fully complete. Statistical confidence remains
+`DIAGNOSTIC_ONLY` until the real stream soaks to at least 30 deduplicated real
+stock outcomes for the relevant decision bucket. Current unique real outcomes:
+1.
