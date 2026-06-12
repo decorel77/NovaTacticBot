@@ -1,0 +1,19 @@
+{
+  "symbol": "AAA",
+  "meta": {
+    "input_source": "fixture",
+    "description": "Synthetic deterministic uptrend. NOT real market data.",
+    "data_is_real": false
+  },
+  "bars": [
+    {"date": "2024-01-01", "open": 100, "high": 101, "low": 99, "close": 100},
+    {"date": "2024-01-02", "open": 100, "high": 110, "low": 100, "close": 108},
+    {"date": "2024-01-03", "open": 108, "high": 112, "low": 106, "close": 110},
+    {"date": "2024-01-04", "open": 110, "high": 115, "low": 109, "close": 114},
+    {"date": "2024-01-05", "open": 114, "high": 116, "low": 112, "close": 115},
+    {"date": "2024-01-06", "open": 115, "high": 118, "low": 113, "close": 117}
+  ],
+  "signals": [
+    {"signal_date": "2024-01-01", "symbol": "AAA", "direction": "long"}
+  ]
+}
