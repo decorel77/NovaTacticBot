@@ -3,9 +3,10 @@
 ## Status
 
 The statistical floor is a QA-016 design-safe advisory layer. It lives in
-`core/statistical_floor.py` and is not enabled by default. It is not wired into
-the runner, report generator, snapshot writer, AllocationBot, Bridge, or any
-execution path.
+`core/statistical_floor.py` and is not enabled by default. The report generator
+has an optional section for precomputed floor results, but the default runner
+does not compute or pass those results. It is not wired into the runner,
+snapshot writer, AllocationBot, Bridge, or any execution path.
 
 NovaTacticBot remains advisory/reporting only.
 
@@ -75,3 +76,6 @@ snapshots, it needs calibration against historical outcomes, documented
 threshold review, and explicit promotion in code and contract docs.
 
 Until then, the floor remains advisory, design-only, and disabled by default.
+If a caller supplies no precomputed floor evidence, the report section fails
+closed to `DIAGNOSTIC_ONLY` and no signal may be labelled `STRONG`.
+Unapproved or malformed entries also render as `DIAGNOSTIC_ONLY`.

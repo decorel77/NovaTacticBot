@@ -1,8 +1,10 @@
 """Statistical floor for tactical signal evidence (QA-016).
 
 Pure advisory/design-safe layer. This module is intentionally not wired into
-the runner, snapshot writer, report generator, or any execution path. It only
-answers whether a tactical signal has enough evidence to be labelled strong.
+the runner, snapshot writer, or any execution path. The report generator may
+display precomputed results, but it does not compute them by default. This
+module only answers whether a tactical signal has enough evidence to be
+labelled strong.
 """
 
 from __future__ import annotations

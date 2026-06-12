@@ -81,6 +81,8 @@ class TacticReportGenerator:
             self._data_quality(result),
             self._supplementary_strategy_performance(supplementary),
             self._supplementary_regime_performance(supplementary),
+            self._supplementary_statistical_floor(supplementary),
+            self._supplementary_strategy_correlation(supplementary),
             self._tactical_observations(result),
             self._open_questions(result),
             self._footer(),
@@ -472,6 +474,106 @@ class TacticReportGenerator:
                 f"| {b.get('signals_created', 0)} | {b.get('trade_count', 0)} "
                 f"| {wr} | {avg_pnl} | {reject_rate} |"
             )
+        return "\n".join(lines)
+
+    def _supplementary_statistical_floor(self, supplementary: "Optional[dict]") -> str:
+        if not supplementary or "statistical_floor" not in supplementary:
+            return ""
+        floor = supplementary.get("statistical_floor")
+        if isinstance(floor, dict):
+            entries = floor.get("signals", [])
+        else:
+            entries = floor
+        if not isinstance(entries, list) or not entries:
+            return "\n".join([
+                "## Statistical Floor (QA-016)",
+                "",
+                "**DIAGNOSTIC_ONLY** - no statistical floor evidence supplied; "
+                "no signal may be labelled STRONG.",
+            ])
+
+        lines = [
+            "## Statistical Floor (QA-016)",
+            "",
+            "_Advisory labels only. This section cannot approve execution, size, or allocation changes._",
+            "",
+            "| Signal | Strategy | Samples | Strength | Refusals |",
+            "|---|---|---|---|---|",
+        ]
+        for entry in entries:
+            if not isinstance(entry, dict):
+                lines.append("| unknown | unknown | N/A | DIAGNOSTIC_ONLY | malformed_floor_entry |")
+                continue
+            metrics = entry.get("metrics") if isinstance(entry.get("metrics"), dict) else {}
+            refusals = entry.get("refusal_reasons") or []
+            if not isinstance(refusals, list):
+                refusals = [str(refusals)]
+            requested_strength = str(entry.get("strength") or "DIAGNOSTIC_ONLY")
+            strength = "DIAGNOSTIC_ONLY"
+            if (
+                requested_strength == "STRONG"
+                and entry.get("approved") is True
+                and entry.get("diagnostic_only") is False
+                and not refusals
+            ):
+                strength = "STRONG"
+            lines.append(
+                f"| {entry.get('signal_id') or 'unknown'} "
+                f"| {entry.get('strategy_id') or 'unknown'} "
+                f"| {metrics.get('sample_size', 'N/A')} "
+                f"| {strength} "
+                f"| {', '.join(str(item) for item in refusals) or 'none'} |"
+            )
+        return "\n".join(lines)
+
+    def _supplementary_strategy_correlation(self, supplementary: "Optional[dict]") -> str:
+        if not supplementary or "strategy_correlation" not in supplementary:
+            return ""
+        correlation = supplementary.get("strategy_correlation")
+        if not isinstance(correlation, dict):
+            return "\n".join([
+                "## Strategy Outcome Correlation (QA-019)",
+                "",
+                "**INSUFFICIENT SAMPLE - no correlation value is reported.** "
+                "Reasons: malformed_correlation_payload",
+            ])
+
+        source_a = correlation.get("source_a", "NovaBotV2")
+        source_b = correlation.get("source_b", "NovaBotV2Options")
+        overlap_days = correlation.get("overlap_days", 0)
+        refusal_reasons = correlation.get("refusal_reasons") or []
+        warnings = correlation.get("warnings") or []
+        caveats = correlation.get("caveats") or []
+        if not isinstance(refusal_reasons, list):
+            refusal_reasons = [str(refusal_reasons)]
+        if not isinstance(warnings, list):
+            warnings = [str(warnings)]
+        if not isinstance(caveats, list):
+            caveats = [str(caveats)]
+
+        lines = [
+            "## Strategy Outcome Correlation (QA-019)",
+            "",
+            f"Streams: `{source_a}` vs `{source_b}` ({overlap_days} overlapping outcome days)",
+            "",
+        ]
+        value = correlation.get("correlation")
+        if correlation.get("insufficient_sample", True) or value is None:
+            lines.append(
+                "**INSUFFICIENT SAMPLE - no correlation value is reported.** "
+                "Reasons: " + (", ".join(str(item) for item in refusal_reasons) or "none recorded")
+            )
+        else:
+            interval = ""
+            if correlation.get("ci_low") is not None and correlation.get("ci_high") is not None:
+                interval = f" (95% CI [{correlation['ci_low']:+.2f}, {correlation['ci_high']:+.2f}])"
+            lines.append(f"Daily realized-PnL correlation: **{float(value):+.2f}**{interval}")
+        if warnings:
+            lines += ["", "Warnings: " + ", ".join(str(item) for item in warnings)]
+        if caveats:
+            lines += ["", "Caveats:"]
+            for caveat in caveats:
+                lines.append(f"- {caveat}")
         return "\n".join(lines)
 
     def _footer(self) -> str:

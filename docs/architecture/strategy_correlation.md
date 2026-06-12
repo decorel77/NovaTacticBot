@@ -3,9 +3,10 @@
 ## Status
 
 The strategy correlation diagnostic is a QA-019 design-safe research layer. It
-lives in `core/strategy_correlation.py` and is not enabled by default. It is
-not wired into the runner, report generator, snapshot writer, AllocationBot,
-Bridge, or any execution path.
+lives in `core/strategy_correlation.py` and is not enabled by default. The
+report generator has an optional section for precomputed correlation results,
+but the default runner does not compute or pass those results. It is not wired
+into the runner, snapshot writer, AllocationBot, Bridge, or any execution path.
 
 NovaTacticBot remains advisory/reporting only.
 
@@ -83,10 +84,11 @@ default TacticBot report **after** both event streams are actually wired:
 3. Adapters must stamp `data_is_real` on outcome events, otherwise the
    default realness gate excludes everything (by design).
 
-Until then `render_markdown_section()` exists as a pure string builder that a
-future, explicitly-approved task can call from the report generator. Nothing
-calls it by default; default runner output, snapshots, and reports are
-unchanged.
+Until then `render_markdown_section()` and the optional report section remain
+display-only helpers. Nothing computes correlation by default; default runner
+output and snapshots are unchanged. If a caller supplies a precomputed
+insufficient-overlap result, the report shows `INSUFFICIENT SAMPLE` and
+withholds the correlation value.
 
 ## AllocationBot and Bridge Interaction
 

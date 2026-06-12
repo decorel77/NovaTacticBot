@@ -1,8 +1,9 @@
 """Strategy outcome correlation diagnostic (QA-019).
 
 Pure advisory/design-safe research layer. This module is intentionally not
-wired into the runner, snapshot writer, report generator, or any execution
-path. It only measures correlation between two trade-outcome event streams
+wired into the runner, snapshot writer, or any execution path. The report
+generator may display precomputed results, but it does not compute them by
+default. It only measures correlation between two trade-outcome event streams
 (e.g. NovaBotV2 vs NovaBotV2Options) so that "diversification" claims can be
 checked instead of assumed.
 
@@ -197,9 +198,9 @@ def compute_strategy_correlation(
 def render_markdown_section(result: StrategyCorrelationResult) -> str:
     """Render the diagnostic as a report section string.
 
-    Pure string builder for future report integration. Nothing in the default
-    runner or report generator calls this; wiring it in is a separate,
-    explicitly-approved task (see docs/architecture/strategy_correlation.md).
+    Pure string builder for display-only report integration. Nothing in the
+    default runner computes or passes this result; production data wiring is a
+    separate, explicitly-approved task (see docs/architecture/strategy_correlation.md).
     """
 
     lines = [

@@ -79,3 +79,80 @@ class TestReportGeneration:
         deep_path = tmp_path / "a" / "b" / "c" / "report.md"
         path = gen.generate(result, output_path=deep_path)
         assert path.exists()
+
+    def test_statistical_floor_section_fails_closed_without_evidence(self):
+        result = run_pipeline([])
+        gen = TacticReportGenerator()
+        content = gen._render(
+            result,
+            "NovaBotV2Options",
+            supplementary={"statistical_floor": []},
+        )
+        assert "Statistical Floor (QA-016)" in content
+        assert "DIAGNOSTIC_ONLY" in content
+        assert "no statistical floor evidence supplied" in content
+
+    def test_statistical_floor_section_renders_sample_counts(self):
+        result = run_pipeline([])
+        gen = TacticReportGenerator()
+        content = gen._render(
+            result,
+            "NovaBotV2Options",
+            supplementary={
+                "statistical_floor": [
+                    {
+                        "signal_id": "sig-1",
+                        "strategy_id": "covered_call",
+                        "strength": "DIAGNOSTIC_ONLY",
+                        "metrics": {"sample_size": 12},
+                        "refusal_reasons": ["sample_size_below_floor:12<30"],
+                    }
+                ]
+            },
+        )
+        assert "sig-1" in content
+        assert "covered_call" in content
+        assert "12" in content
+        assert "sample_size_below_floor:12<30" in content
+
+    def test_statistical_floor_section_refuses_unapproved_strong_label(self):
+        result = run_pipeline([])
+        gen = TacticReportGenerator()
+        content = gen._render(
+            result,
+            "NovaBotV2Options",
+            supplementary={
+                "statistical_floor": [
+                    {
+                        "signal_id": "sig-strong",
+                        "strategy_id": "covered_call",
+                        "strength": "STRONG",
+                        "metrics": {"sample_size": 99},
+                    }
+                ]
+            },
+        )
+        assert "| sig-strong | covered_call | 99 | DIAGNOSTIC_ONLY | none |" in content
+
+    def test_strategy_correlation_section_withholds_small_sample(self):
+        result = run_pipeline([])
+        gen = TacticReportGenerator()
+        content = gen._render(
+            result,
+            "NovaBotV2Options",
+            supplementary={
+                "strategy_correlation": {
+                    "source_a": "NovaBotV2",
+                    "source_b": "NovaBotV2Options",
+                    "overlap_days": 4,
+                    "insufficient_sample": True,
+                    "correlation": None,
+                    "refusal_reasons": ["insufficient_overlap:4<30"],
+                    "caveats": ["Diagnostic only."],
+                }
+            },
+        )
+        assert "Strategy Outcome Correlation (QA-019)" in content
+        assert "INSUFFICIENT SAMPLE" in content
+        assert "no correlation value is reported" in content
+        assert "insufficient_overlap:4<30" in content
