@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_REPORT_PATH = Path("data/reports/tacticbot_report.md")
 DEFAULT_DIAGNOSTICS_PATH = Path("data/reports/adapter_diagnostics.md")
+MIN_CONFIDENCE_TRADE_OUTCOMES = 30
 
 
 class TacticReportGenerator:
@@ -121,6 +122,11 @@ class TacticReportGenerator:
             f"- **Overall win rate:** {overall_wr}",
             f"- **Total realized PnL:** ${overall_pnl:,.2f}",
         ]
+        if overall_trades < MIN_CONFIDENCE_TRADE_OUTCOMES:
+            lines.append(
+                f"- **Statistical confidence:** DIAGNOSTIC_ONLY "
+                f"(completed trades {overall_trades} < {MIN_CONFIDENCE_TRADE_OUTCOMES})"
+            )
         if result.observations:
             lines += ["", f"- **Key observations:** {len(result.observations)} (see Observations section)"]
         if result.open_questions:

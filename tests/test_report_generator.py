@@ -73,6 +73,25 @@ class TestReportGeneration:
         assert len(content) > 100
         assert "Executive Summary" in content
 
+    def test_small_real_outcome_sample_is_marked_diagnostic_only(self, tmp_path):
+        events = [
+            TacticalEvent(
+                source_bot=SourceBot.NOVA_BOT_V2,
+                event_type=EventType.TRADE_OUTCOME,
+                strategy_id="BREAKOUT",
+                outcome=Outcome.WIN,
+                realized_pnl=5.0,
+                metadata={"data_is_real": True},
+            )
+        ]
+        result = run_pipeline(events)
+        gen = TacticReportGenerator()
+        path = gen.generate(result, output_path=tmp_path / "report.md")
+        content = path.read_text()
+        assert "Overall win rate" in content
+        assert "DIAGNOSTIC_ONLY" in content
+        assert "completed trades 1 < 30" in content
+
     def test_creates_parent_directories(self, tmp_path):
         result = run_pipeline([])
         gen = TacticReportGenerator()
