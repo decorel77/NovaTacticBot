@@ -15,11 +15,14 @@ Usage:
     # Real NovaBotV2Options directory:
     python tools/run_tacticbot.py --nova-options-dir C:/NovaGPT/Apps/NovaBotV2Options
 
+    # Real NovaBotV2 closed stock trade outcomes:
+    python tools/run_tacticbot.py --nova-botv2-dir C:/NovaGPT/Apps/NovaBotV2
+
     # Generic source directory (JSON/CSV/log files):
     python tools/run_tacticbot.py --source-dir PATH
 
-    # Both:
-    python tools/run_tacticbot.py --nova-options-dir PATH --source-dir PATH2
+    # Multiple advisory sources:
+    python tools/run_tacticbot.py --nova-options-dir PATH --nova-botv2-dir PATH2
 """
 
 from __future__ import annotations
@@ -37,6 +40,7 @@ if str(_PROJECT_ROOT) not in sys.path:
 
 from utils.guardrails import run_all_checks, GuardrailViolation
 from adapters.options_adapter import OptionsAdapter
+from adapters.nova_botv2_trade_adapter import NovaBotV2TradeAdapter
 from adapters.nova_options_adapter import NovaBotV2OptionsAdapter
 from core.tactic_analytics_engine import TacticAnalyticsEngine
 from core.tactic_event import TacticalEvent
@@ -57,6 +61,7 @@ from workflow.tactic_html_dashboard import TacticHtmlDashboard
 _SYSTEM_DIR = _PROJECT_ROOT / "data" / "system"
 _LOGS_DIR = _PROJECT_ROOT / "data" / "logs"
 _REPORTS_DIR = _PROJECT_ROOT / "data" / "reports"
+_NOVA_BOTV2_EVENTS_RELPATH = Path("data") / "results"
 
 # Canonical required keys (REPAIR-003 NovaBridge schema). Checked inline so the
 # runner stays decoupled from NovaBridge; the test suite runs the real validator.
@@ -83,6 +88,11 @@ def parse_args() -> argparse.Namespace:
         help="Root directory of NovaBotV2Options repository (reads data/logs/ and data/reports/)",
     )
     parser.add_argument(
+        "--nova-botv2-dir",
+        default=None,
+        help="Root directory of NovaBotV2 repository (read-only: reads data/results/trade_events.jsonl)",
+    )
+    parser.add_argument(
         "--source-dir",
         default=None,
         help="Generic source directory containing JSON/CSV/log files (OptionsAdapter)",
@@ -102,6 +112,67 @@ def parse_args() -> argparse.Namespace:
     # is aborted, with no bypass. Run NovaTacticBot inside its broker-free venv
     # (see setup_venv.ps1 / setup_venv.sh) instead of weakening the guardrail.
     return parser.parse_args()
+
+
+def _nova_botv2_results_dir(nova_botv2_dir: str | Path) -> Path:
+    """Resolve a NovaBotV2 repo root to its read-only trade outcome directory."""
+    return Path(nova_botv2_dir) / _NOVA_BOTV2_EVENTS_RELPATH
+
+
+def load_tactic_events(args: argparse.Namespace) -> tuple[
+    list[TacticalEvent],
+    list[str],
+    object | None,
+    dict | None,
+]:
+    """Load all configured advisory input streams.
+
+    This is intentionally limited to adapter reads. It does not call brokers,
+    schedulers, live cycles, or any NovaBotV2 runtime modules.
+    """
+    events: list[TacticalEvent] = []
+    adapter_errors: list[str] = []
+    diagnostics = None
+    supplementary = None
+
+    # Real NovaBotV2Options directory (paper/advisory options stream)
+    if args.nova_options_dir:
+        nova_adapter = NovaBotV2OptionsAdapter(source_dir=args.nova_options_dir)
+        nova_events = nova_adapter.load()
+        events.extend(nova_events)
+        adapter_errors.extend(nova_adapter.load_errors)
+        diagnostics = nova_adapter.diagnostics
+        supplementary = {
+            "strategy_performance": nova_adapter.strategy_performance,
+            "regime_performance": nova_adapter.regime_performance,
+            "lifecycle_summary": nova_adapter.lifecycle_summary,
+        }
+        logger.info(
+            "NovaBotV2OptionsAdapter: %d events (diagnostics: %d skipped, %d errors)",
+            len(nova_events),
+            nova_adapter.diagnostics.records_skipped,
+            len(nova_adapter.diagnostics.parse_errors),
+        )
+
+    # Real NovaBotV2 closed stock trade outcomes. The adapter reads only
+    # data/results/trade_events.jsonl and preserves its own broker-fill dedup.
+    if args.nova_botv2_dir:
+        source_dir = _nova_botv2_results_dir(args.nova_botv2_dir)
+        stock_adapter = NovaBotV2TradeAdapter(source_dir=source_dir)
+        stock_events = stock_adapter.load()
+        events.extend(stock_events)
+        adapter_errors.extend(stock_adapter.load_errors)
+        logger.info("NovaBotV2TradeAdapter: %d events from %s", len(stock_events), source_dir)
+
+    # Generic source directory (OptionsAdapter -- JSON/CSV/log)
+    if args.source_dir:
+        options_adapter = OptionsAdapter(source_dir=args.source_dir)
+        options_events = options_adapter.load()
+        events.extend(options_events)
+        adapter_errors.extend(options_adapter.load_errors)
+        logger.info("OptionsAdapter: %d events", len(options_events))
+
+    return events, adapter_errors, diagnostics, supplementary
 
 
 def _check_canonical_conformance(snapshot: dict) -> list[str]:
@@ -236,42 +307,12 @@ def main() -> int:
         return 1
 
     # ── Step 2 & 3: Load adapters and events ───────────────────────────────────
-    events: list[TacticalEvent] = []
-    adapter_errors: list[str] = []
-    diagnostics = None
-    supplementary = None
+    events, adapter_errors, diagnostics, supplementary = load_tactic_events(args)
 
-    # Real NovaBotV2Options directory (preferred)
-    if args.nova_options_dir:
-        nova_adapter = NovaBotV2OptionsAdapter(source_dir=args.nova_options_dir)
-        nova_events = nova_adapter.load()
-        events.extend(nova_events)
-        adapter_errors.extend(nova_adapter.load_errors)
-        diagnostics = nova_adapter.diagnostics
-        supplementary = {
-            "strategy_performance": nova_adapter.strategy_performance,
-            "regime_performance": nova_adapter.regime_performance,
-            "lifecycle_summary": nova_adapter.lifecycle_summary,
-        }
-        logger.info(
-            "NovaBotV2OptionsAdapter: %d events (diagnostics: %d skipped, %d errors)",
-            len(nova_events),
-            nova_adapter.diagnostics.records_skipped,
-            len(nova_adapter.diagnostics.parse_errors),
-        )
-
-    # Generic source directory (OptionsAdapter — JSON/CSV/log)
-    if args.source_dir:
-        options_adapter = OptionsAdapter(source_dir=args.source_dir)
-        options_events = options_adapter.load()
-        events.extend(options_events)
-        adapter_errors.extend(options_adapter.load_errors)
-        logger.info("OptionsAdapter: %d events", len(options_events))
-
-    if not args.nova_options_dir and not args.source_dir:
+    if not args.nova_options_dir and not args.nova_botv2_dir and not args.source_dir:
         logger.warning(
-            "No source directory specified. Pass --nova-options-dir or --source-dir. "
-            "Generating empty report."
+            "No source directory specified. Pass --nova-options-dir, "
+            "--nova-botv2-dir, or --source-dir. Generating empty report."
         )
 
     logger.info("Total events loaded: %d", len(events))
@@ -307,7 +348,12 @@ def main() -> int:
     # ── Step 5b: Persist run-path artifacts (REPAIR-004) ───────────────────────
     # POST-005: data_is_real is derived from trusted adapter provenance, not from
     # whether a source directory was passed. Generic/dummy input stays false.
-    provenance = derive_run_provenance(args.nova_options_dir, args.source_dir)
+    provenance = derive_run_provenance(
+        args.nova_options_dir,
+        args.source_dir,
+        nova_botv2_dir=args.nova_botv2_dir,
+        events=events,
+    )
     input_source = provenance.input_source
     data_is_real = provenance.data_is_real
     for reason in provenance.reasons:

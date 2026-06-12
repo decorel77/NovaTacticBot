@@ -17,11 +17,16 @@ from utils.source_provenance import (
     DEFAULT_MAX_SOURCE_AGE_HOURS,
     GENERIC_SOURCE,
     MIXED_SOURCE,
+    MIXED_STOCK_GENERIC_SOURCE,
+    MIXED_STOCK_OPTIONS_SOURCE,
     NO_SOURCE,
+    TRUSTED_SOURCE_NOVA_BOTV2,
     TRUSTED_SOURCE_NOVA_OPTIONS,
+    assess_nova_botv2_stock_outcomes,
     assess_nova_options_source,
     derive_run_provenance,
 )
+from core.tactic_event import EventType, SourceBot, TacticalEvent
 
 NOW = datetime(2026, 6, 11, 12, 0, 0, tzinfo=timezone.utc)
 
@@ -57,6 +62,22 @@ def _real_flagged_snapshot(age_hours: float = 1.0, **overrides) -> dict:
     return snap
 
 
+def _stock_root(root: Path) -> Path:
+    events = root / "data" / "results" / "trade_events.jsonl"
+    events.parent.mkdir(parents=True, exist_ok=True)
+    events.write_text('{"event_type": "SELL_EXECUTED"}\n', encoding="utf-8")
+    return root
+
+
+def _stock_event(*, data_is_real: bool = True) -> TacticalEvent:
+    return TacticalEvent(
+        source_bot=SourceBot.NOVA_BOT_V2,
+        event_type=EventType.TRADE_OUTCOME,
+        strategy_id="BREAKOUT",
+        metadata={"data_is_real": data_is_real},
+    )
+
+
 class TestDummyAndGenericSources:
     def test_dummy_dir_is_not_real(self, tmp_path):
         # A bare directory with random files: no adapter inputs, no snapshot.
@@ -81,11 +102,12 @@ class TestDummyAndGenericSources:
 
 
 class TestTrustedOptionsSource:
-    def test_verified_fresh_real_flagged_source_is_real(self, tmp_path):
+    def test_verified_fresh_real_flagged_options_source_is_diagnostic_only(self, tmp_path):
         _build_trusted_dir(tmp_path)
         result = derive_run_provenance(tmp_path, None, now=NOW)
-        assert result.data_is_real is True
+        assert result.data_is_real is False
         assert result.input_source == TRUSTED_SOURCE_NOVA_OPTIONS
+        assert any("paper/advisory" in r for r in result.reasons)
 
     def test_canonical_data_is_real_flag_also_accepted(self, tmp_path):
         snap = _real_flagged_snapshot()
@@ -150,3 +172,47 @@ class TestMixedSources:
         result = derive_run_provenance(trusted, generic, now=NOW)
         assert result.data_is_real is False
         assert result.input_source == MIXED_SOURCE
+
+
+class TestNovaBotV2StockOutcomeSource:
+    def test_real_stock_outcome_makes_run_real(self, tmp_path):
+        stock = _stock_root(tmp_path / "NovaBotV2")
+        result = derive_run_provenance(None, None, nova_botv2_dir=stock, events=[_stock_event()])
+        assert result.data_is_real is True
+        assert result.input_source == TRUSTED_SOURCE_NOVA_BOTV2
+
+    def test_paper_or_unloaded_stock_outcomes_fail_closed(self, tmp_path):
+        stock = _stock_root(tmp_path / "NovaBotV2")
+        paper = derive_run_provenance(
+            None, None, nova_botv2_dir=stock, events=[_stock_event(data_is_real=False)]
+        )
+        unloaded = derive_run_provenance(None, None, nova_botv2_dir=stock, events=[])
+        assert paper.data_is_real is False
+        assert unloaded.data_is_real is False
+
+    def test_stock_plus_options_uses_stock_realness_only(self, tmp_path):
+        options = _build_trusted_dir(tmp_path / "options")
+        stock = _stock_root(tmp_path / "NovaBotV2")
+        result = derive_run_provenance(
+            options, None, nova_botv2_dir=stock, events=[_stock_event()], now=NOW
+        )
+        assert result.data_is_real is True
+        assert result.input_source == MIXED_STOCK_OPTIONS_SOURCE
+        assert any("paper/advisory" in r for r in result.reasons)
+
+    def test_generic_source_taints_real_stock_outcomes_to_false(self, tmp_path):
+        stock = _stock_root(tmp_path / "NovaBotV2")
+        generic = tmp_path / "generic"
+        generic.mkdir()
+        result = derive_run_provenance(
+            None, generic, nova_botv2_dir=stock, events=[_stock_event()]
+        )
+        assert result.data_is_real is False
+        assert result.input_source == MIXED_STOCK_GENERIC_SOURCE
+
+    def test_stock_source_requires_expected_readonly_input_file(self, tmp_path):
+        stock = tmp_path / "NovaBotV2"
+        stock.mkdir()
+        result = assess_nova_botv2_stock_outcomes(stock, events=[_stock_event()])
+        assert result.data_is_real is False
+        assert any("trade_events.jsonl" in r for r in result.reasons)

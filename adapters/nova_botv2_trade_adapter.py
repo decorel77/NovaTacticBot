@@ -19,9 +19,8 @@ can see everything while QA-016/QA-019 filter on data_is_real. Fail-closed: any
 unknown/missing execution mode is treated as NOT real.
 
 Hard safety: READ-ONLY. No writes to NovaBotV2. No broker access. ADVISORY_ONLY.
-This module is intentionally NOT wired into tools/run_tacticbot.py — it is
-adapter/contract prep per the NEXT queue and stays out of the default runtime
-until its preconditions (advisory cadence, review) are met.
+The runner wires this adapter only when --nova-botv2-dir is provided; default
+runs do not touch the NovaBotV2 outcome stream.
 """
 from __future__ import annotations
 
