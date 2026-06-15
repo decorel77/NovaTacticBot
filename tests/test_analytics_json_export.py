@@ -109,6 +109,28 @@ class SerializationTests(unittest.TestCase):
         self.assertEqual(to_json(result), to_json(result))
 
 
+class FieldCoverageTests(unittest.TestCase):
+    """Drift guard: the exporter must serialize every top-level AnalyticsResult
+    field, so a future analytics field cannot silently drop out of the export
+    (e.g. if asdict is ever replaced by a hand-written serializer)."""
+
+    def test_every_analytics_result_field_is_exported(self):
+        from dataclasses import fields
+
+        expected = {f.name for f in fields(AnalyticsResult)}
+        exported = set(result_to_dict(_populated_result())["analytics"].keys())
+        missing = expected - exported
+        self.assertEqual(set(), missing, f"export dropped fields: {sorted(missing)}")
+
+    def test_export_adds_no_unexpected_top_level_keys(self):
+        from dataclasses import fields
+
+        expected = {f.name for f in fields(AnalyticsResult)}
+        exported = set(result_to_dict(AnalyticsResult())["analytics"].keys())
+        extra = exported - expected
+        self.assertEqual(set(), extra, f"export added unexpected keys: {sorted(extra)}")
+
+
 class SafetyTests(unittest.TestCase):
     def test_no_broker_or_network_imports(self):
         from utils.guardrails import _BANNED_PACKAGES
