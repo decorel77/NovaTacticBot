@@ -118,6 +118,7 @@ These modules are research-only: not imported by `tools/run_tacticbot.py` or any
 - `research/pattern_outcome_bridge.py` — trade-outcome diagnostic summary; NEXT-016 `min_sample=30` sample floor
 - `research/stock_tactics_backtest.py` — offline backtest harness (NEXT-015)
 - `research/analytics_json_export.py` — JSON serializer for `AnalyticsResult` (TACTIC-RP-002); deterministic, ASCII-safe, `data_is_real` propagated
+- `research/analytics_json_export_cli.py` — offline synthetic-only CLI for the JSON export (stdout only, `data_is_real=false`, no real-dir reads, fail-closed)
 - `research/regime_strategy_fit.py` — regime x strategy fit matrix (TACTIC-RA-003); diagnostic-only, sample-gated, fail-closed
 - `research/regime_strategy_fit_report.py` — Markdown render layer for the fit matrix (withheld cells shown `INSUFFICIENT_SAMPLE`)
 - `research/regime_strategy_fit_json.py` — JSON serializer for the fit matrix (withheld cells `null`)
@@ -131,7 +132,7 @@ These modules are research-only: not imported by `tools/run_tacticbot.py` or any
 ### Task Queue
 - `data/system/task_queue.json` — 100 tasks across 15 phases (NOVA standard format)
 
-### Tests (528 passing + 259 subtests — verified 2026-06-15, broker-free venv)
+### Tests (537 passing + 284 subtests — verified 2026-06-15, broker-free venv)
 The list below is representative, not exhaustive. Research-layer suites include
 `test_analytics_json_export.py`, `test_regime_strategy_fit.py`,
 `test_regime_strategy_fit_report.py`, `test_regime_strategy_fit_json.py`,
