@@ -111,6 +111,17 @@
 - `utils/cross_run_trend_analyser.py` — cross-run trend analysis: win-rate shift, volume shift, strategy mix change (TACTIC-HA-005)
 - `utils/multi_source_merger.py` — merges TacticalEvents from all adapters; deduplicates on event_id/signal_id; MergeStats (TACTIC-DC-009)
 
+### Research (offline, unwired, diagnostic-only)
+These modules are research-only: not imported by `tools/run_tacticbot.py` or any scheduler, broker-free, fail-closed, and synthetic-fixture tested.
+- `research/pattern_recognition.py` — explainable price-pattern detectors over synthetic OHLC(V)
+- `research/pattern_report.py` — Markdown render layer for `PatternScanReport`
+- `research/pattern_outcome_bridge.py` — trade-outcome diagnostic summary; NEXT-016 `min_sample=30` sample floor
+- `research/stock_tactics_backtest.py` — offline backtest harness (NEXT-015)
+- `research/analytics_json_export.py` — JSON serializer for `AnalyticsResult` (TACTIC-RP-002); deterministic, ASCII-safe, `data_is_real` propagated
+- `research/regime_strategy_fit.py` — regime x strategy fit matrix (TACTIC-RA-003); diagnostic-only, sample-gated, fail-closed
+- `research/regime_strategy_fit_report.py` — Markdown render layer for the fit matrix (withheld cells shown `INSUFFICIENT_SAMPLE`)
+- `research/regime_strategy_fit_json.py` — JSON serializer for the fit matrix (withheld cells `null`)
+
 ### Workflow
 - `workflow/tactic_html_dashboard.py` — self-contained HTML dashboard (TACTIC-DB-003) — writes `data/reports/tactic_dashboard.html`
 
@@ -120,7 +131,12 @@
 ### Task Queue
 - `data/system/task_queue.json` — 100 tasks across 15 phases (NOVA standard format)
 
-### Tests (275 passing)
+### Tests (528 passing + 259 subtests — verified 2026-06-15, broker-free venv)
+The list below is representative, not exhaustive. Research-layer suites include
+`test_analytics_json_export.py`, `test_regime_strategy_fit.py`,
+`test_regime_strategy_fit_report.py`, `test_regime_strategy_fit_json.py`,
+`test_pattern_recognition.py`, `test_pattern_outcome_bridge.py`, and
+`test_cross_run_trend_analyser.py`.
 - `tests/test_tactic_event.py`
 - `tests/test_options_adapter.py`
 - `tests/test_analytics_engine.py`
