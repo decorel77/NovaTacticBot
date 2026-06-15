@@ -1,0 +1,13 @@
+{
+  "input_source": "sanitized-structural-example",
+  "meta": {
+    "description": "STRUCTURAL/SANITIZED example only: data_is_real=true flags are present to exercise propagation. These are NOT real private trade records; values are synthetic. Do not treat as a real outcome stream.",
+    "data_is_real": true,
+    "sanitized": true
+  },
+  "outcomes": [
+    {"date": "2024-06-01", "setup_label": "TREND_PULLBACK", "outcome": "WIN", "return_pct": 1.1, "data_is_real": true},
+    {"date": "2024-06-02", "setup_label": "TREND_PULLBACK", "outcome": "WIN", "return_pct": 0.9, "data_is_real": true},
+    {"date": "2024-06-03", "setup_label": "TREND_PULLBACK", "outcome": "LOSS", "return_pct": -0.7, "data_is_real": true}
+  ]
+}

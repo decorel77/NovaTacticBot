@@ -1,0 +1,13 @@
+{
+  "input_source": "fixture",
+  "meta": {
+    "description": "Synthetic tiny trade-outcome sample (below threshold). NOT real trade history.",
+    "data_is_real": false
+  },
+  "outcomes": [
+    {"date": "2024-04-01", "setup_label": "BREAKOUT", "outcome": "WIN", "return_pct": 3.1, "data_is_real": false},
+    {"date": "2024-04-02", "setup_label": "BREAKOUT", "outcome": "LOSS", "return_pct": -1.4, "data_is_real": false},
+    {"date": "2024-04-03", "setup_label": "BREAKOUT", "outcome": "WIN", "return_pct": 2.0, "data_is_real": false},
+    {"date": "2024-04-04", "setup_label": "BREAKOUT", "outcome": "WIN", "return_pct": 1.2, "data_is_real": false}
+  ]
+}

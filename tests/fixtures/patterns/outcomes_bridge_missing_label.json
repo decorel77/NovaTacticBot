@@ -1,0 +1,12 @@
+{
+  "input_source": "fixture",
+  "meta": {
+    "description": "Synthetic outcomes with missing/empty/unrecognized setup labels (all fail closed to UNKNOWN). NOT real trade history.",
+    "data_is_real": false
+  },
+  "outcomes": [
+    {"date": "2024-05-01", "setup_label": "", "outcome": "WIN", "return_pct": 1.0, "data_is_real": false},
+    {"date": "2024-05-02", "outcome": "LOSS", "return_pct": -1.0, "data_is_real": false},
+    {"date": "2024-05-03", "setup_label": "MYSTERY", "outcome": "WIN", "return_pct": 0.5, "data_is_real": false}
+  ]
+}

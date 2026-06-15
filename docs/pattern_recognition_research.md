@@ -231,6 +231,78 @@ human-reviewed promotion and real out-of-sample sample sizes (the NEXT-016
 ≥30-per-setup gate). Even then it would stay descriptive and never gain
 broker/order/risk authority.
 
+## Trade-outcome bridge (`research/pattern_outcome_bridge.py`)
+
+A research-only bridge from **already-ingested NovaBotV2 trade outcomes** to a
+diagnostic summary that the report layer can render. It is the trade-outcome
+counterpart of the recognition module and is deliberately kept **separate**.
+
+### Price-pattern detection vs trade-outcome summaries
+
+| | `pattern_recognition.py` | `pattern_outcome_bridge.py` |
+|---|---|---|
+| Input | OHLCV **price bars** | closed-trade **outcome labels** |
+| Question | "what chart structure is in this window?" | "how did setups actually resolve?" |
+| Output | per-window `PatternSignal`s | per-setup win/loss tallies + clusters |
+| `bars_analysed` | the window length | **always 0** (no bars touched) |
+
+The bridge **never fabricates OHLCV bars** from outcomes. If only trade outcomes
+exist, you get outcome tallies — never invented price structure. `bars_analysed`
+is pinned to `0` and `ohlcv_used` to `false`, and a test asserts the
+`PatternScanReport`-compatible object it emits contains **no** price-pattern
+signals (only a single non-detected `trade_outcome_clusters` diagnostic signal).
+
+### What it computes
+
+Grouped by **normalized setup label** (same fail-closed `UNKNOWN` vocabulary as
+the rest): `sample_count`, `real_sample_count`, `win_count`/`loss_count`,
+`win_rate` (**only** when `sample_count` ≥ the documented minimum, else
+`null`/INSUFFICIENT_SAMPLE), `average_return_pct` (only when enough sample and
+returns are present), `longest_win_cluster`/`longest_loss_cluster`,
+`setup_labels` present, and `data_is_real` (true only when **every** record in a
+group is real — propagated from the adapter's `execution_mode` provenance, never
+invented). It accepts sanitized record dicts/JSON, or read-only
+`NovaBotV2TradeAdapter` events via `outcomes_from_events(...)`.
+
+### Sample limitation — why this stays diagnostic-only
+
+The current real stock-outcome stream is **tiny (~1 deduplicated real
+outcome)**. The bridge uses a documented threshold of **`min_sample = 30` real
+outcomes** (the NEXT-016 gate). Below it, the report status is
+`INSUFFICIENT_SAMPLE`: per-setup win rates and averages are **withheld**
+(`null`), and the whole report is marked `DIAGNOSTIC_ONLY`. Reaching the
+threshold lets a win rate be *shown*, but the status stays `DIAGNOSTIC_ONLY` —
+a number is **never** upgraded to a trusted strategy edge or signal. With n far
+below 30, any per-setup rate is noise, and the report says so explicitly.
+
+### CLI (offline, synthetic by default)
+
+```bash
+# default: a synthetic outcomes fixture (data_is_real propagated from the file)
+.\.venv\Scripts\python.exe -m research.pattern_outcome_bridge `
+    tests/fixtures/patterns/outcomes_bridge_clusters.json
+
+# render via the report layer (PatternScanReport-compatible path)
+.\.venv\Scripts\python.exe -m research.pattern_outcome_bridge `
+    tests/fixtures/patterns/outcomes_bridge_clusters.json --scan-report
+```
+
+The CLI **defaults to synthetic data** and never asserts realness. It reads a
+real NovaBotV2 outcome directory **only** when an explicit `--nova-botv2-dir
+PATH` is given — and even then it is **read-only and manual** (it uses the
+existing read-only `NovaBotV2TradeAdapter`, prints a read-only notice to stderr,
+makes no writes, and contacts no broker). It is **not** wired into
+`tools/run_tacticbot.py` or any scheduler, and a test enforces that.
+
+### Future integration path (into reports only)
+
+A future *diagnostic-only* step would surface this summary inside a research
+**report** (read-only), behind an explicit research flag, after a human-reviewed
+promotion — and only once real, deduplicated, out-of-sample outcomes per setup
+pass the ≥30 threshold. It would remain descriptive: it can never reach a
+broker, change risk or capital, place anything, or influence a live trading
+decision.
+
 ## Known limitations
 
 - **Transparent heuristics, not models.** Confidence is a bounded formula per

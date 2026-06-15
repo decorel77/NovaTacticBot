@@ -1,0 +1,18 @@
+{
+  "input_source": "fixture",
+  "meta": {
+    "description": "Synthetic mixed win/loss clusters across two setups. NOT real trade history.",
+    "data_is_real": false
+  },
+  "outcomes": [
+    {"date": "2024-03-01", "setup_label": "TREND_PULLBACK", "outcome": "WIN", "return_pct": 2.0, "data_is_real": false},
+    {"date": "2024-03-02", "setup_label": "TREND_PULLBACK", "outcome": "WIN", "return_pct": 1.5, "data_is_real": false},
+    {"date": "2024-03-03", "setup_label": "TREND_PULLBACK", "outcome": "WIN", "return_pct": 3.0, "data_is_real": false},
+    {"date": "2024-03-04", "setup_label": "TREND_PULLBACK", "outcome": "LOSS", "return_pct": -2.0, "data_is_real": false},
+    {"date": "2024-03-05", "setup_label": "rsi_cross_up", "outcome": "LOSS", "return_pct": -1.0, "data_is_real": false},
+    {"date": "2024-03-06", "setup_label": "rsi_cross_up", "outcome": "LOSS", "return_pct": -1.2, "data_is_real": false},
+    {"date": "2024-03-07", "setup_label": "rsi_cross_up", "outcome": "WIN", "return_pct": 0.8, "data_is_real": false},
+    {"date": "2024-03-08", "setup_label": "rsi_cross_up", "outcome": "LOSS", "return_pct": -0.5, "data_is_real": false},
+    {"date": "2024-03-09", "setup_label": "rsi_cross_up", "outcome": "LOSS", "return_pct": -0.9, "data_is_real": false}
+  ]
+}
