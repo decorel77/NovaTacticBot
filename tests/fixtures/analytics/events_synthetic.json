@@ -1,0 +1,9 @@
+{
+  "_note": "Synthetic events fixture for the offline analytics JSON-export CLI. Not real data; data_is_real is always false.",
+  "events": [
+    {"source_bot": "NovaBotV2Options", "event_type": "TRADE_OUTCOME", "strategy_id": "covered_call", "timestamp": "2026-06-01T12:00:00+00:00", "regime": "BULL", "score": 0.7, "realized_pnl": 1.5, "outcome": "WIN", "metadata": {"symbol": "AAPL"}},
+    {"source_bot": "NovaBotV2Options", "event_type": "TRADE_OUTCOME", "strategy_id": "covered_call", "timestamp": "2026-06-02T12:00:00+00:00", "regime": "BULL", "score": 0.55, "realized_pnl": -1.0, "outcome": "LOSS", "metadata": {"symbol": "AAPL"}},
+    {"source_bot": "NovaBotV2Options", "event_type": "TRADE_OUTCOME", "strategy_id": "long_call", "timestamp": "2026-06-03T12:00:00+00:00", "regime": "BEAR", "score": 0.8, "realized_pnl": 2.0, "outcome": "WIN", "metadata": {"symbol": "SPY"}},
+    {"source_bot": "NovaBotV2Options", "event_type": "REJECTION", "strategy_id": "long_call", "timestamp": "2026-06-04T12:00:00+00:00", "regime": "NORMAL", "score": 0.4, "metadata": {"symbol": "QQQ"}}
+  ]
+}
