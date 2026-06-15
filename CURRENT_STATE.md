@@ -122,6 +122,9 @@ These modules are research-only: not imported by `tools/run_tacticbot.py` or any
 - `research/regime_strategy_fit.py` — regime x strategy fit matrix (TACTIC-RA-003); diagnostic-only, sample-gated, fail-closed
 - `research/regime_strategy_fit_report.py` — Markdown render layer for the fit matrix (withheld cells shown `INSUFFICIENT_SAMPLE`)
 - `research/regime_strategy_fit_json.py` — JSON serializer for the fit matrix (withheld cells `null`)
+- `research/pnl_distribution.py` — descriptive realized-PnL distribution (TACTIC-HA-006); histogram/mean/median/min/max, win-loss split, fail-closed, sample-aware
+- `research/holding_period_analytics.py` — descriptive holding-period summary (TACTIC-HA-007); never fabricates timestamps, skips invalid spans, fail-closed
+- See `docs/research_diagnostic_outputs.md` for the shared contract and the human-gated promotion path.
 
 ### Workflow
 - `workflow/tactic_html_dashboard.py` — self-contained HTML dashboard (TACTIC-DB-003) — writes `data/reports/tactic_dashboard.html`
@@ -132,7 +135,7 @@ These modules are research-only: not imported by `tools/run_tacticbot.py` or any
 ### Task Queue
 - `data/system/task_queue.json` — 100 tasks across 15 phases (NOVA standard format)
 
-### Tests (537 passing + 284 subtests — verified 2026-06-15, broker-free venv)
+### Tests (570 passing + 336 subtests — verified 2026-06-15, broker-free venv)
 The list below is representative, not exhaustive. Research-layer suites include
 `test_analytics_json_export.py`, `test_regime_strategy_fit.py`,
 `test_regime_strategy_fit_report.py`, `test_regime_strategy_fit_json.py`,
