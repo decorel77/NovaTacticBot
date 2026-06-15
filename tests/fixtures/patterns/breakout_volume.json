@@ -1,0 +1,18 @@
+{
+  "symbol": "BRK",
+  "meta": {
+    "input_source": "fixture",
+    "description": "Synthetic deterministic tight consolidation then breakout bar with a volume spike. NOT real market data.",
+    "data_is_real": false
+  },
+  "bars": [
+    {"date": "2024-01-01", "open": 100, "high": 101, "low": 99, "close": 100, "volume": 1000},
+    {"date": "2024-01-02", "open": 100, "high": 101, "low": 99, "close": 100.5, "volume": 1000},
+    {"date": "2024-01-03", "open": 100.5, "high": 101, "low": 99.5, "close": 100, "volume": 1000},
+    {"date": "2024-01-04", "open": 100, "high": 101, "low": 99, "close": 100, "volume": 1000},
+    {"date": "2024-01-05", "open": 100, "high": 100.8, "low": 99.2, "close": 100.2, "volume": 1000},
+    {"date": "2024-01-06", "open": 100.2, "high": 101, "low": 99.5, "close": 100, "volume": 1000},
+    {"date": "2024-01-07", "open": 100, "high": 101, "low": 99, "close": 100.5, "volume": 1000},
+    {"date": "2024-01-08", "open": 101, "high": 106, "low": 101, "close": 105, "volume": 3000}
+  ]
+}
