@@ -6,6 +6,25 @@
 
 ---
 
+## Latest Status — 2026-06-15
+
+- TACTIC-HA-005 cross-run trend analysis is **built and verified**:
+  `utils/cross_run_trend_analyser.py` with `tests/test_cross_run_trend_analyser.py`.
+  An earlier status drift listed it under "What Is NOT Yet Built"; that is corrected
+  below. It is research/diagnostic-only and read-only, and is **not wired** into
+  `tools/run_tacticbot.py` or any scheduler.
+- Verification run (broker-free venv, synthetic fixtures only): the analyser's
+  targeted tests pass at **26/26** after adding fail-closed, small-sample-visibility,
+  and determinism cases. The full NovaTacticBot suite passes at **472 tests + 145
+  subtests**.
+- The analyser fails closed on insufficient (`<2` baselines), empty, or partial
+  records: absent metrics are skipped, never coerced into a fabricated trend.
+- Safety boundary unchanged: no scheduler, `.env`, live-arm, broker/order code,
+  risk/capital settings, deploy, NovaBotV2 producer output, or live cycle was
+  touched. No real runtime/outcome data was read; all fixtures are synthetic.
+
+---
+
 ## Latest Status — 2026-06-12
 
 - NEXT-008/009 read-only NovaBotV2 stock outcome wiring is active behind
@@ -99,7 +118,7 @@
 - `tests/test_run_history_tracker.py` — NEW (5 tests)
 - `tests/test_adapter_error_logger.py` — NEW (5 tests)
 - `tests/test_tactic_html_dashboard.py` — NEW (5 tests)
-- `tests/test_cross_run_trend_analyser.py` — NEW (21 tests)
+- `tests/test_cross_run_trend_analyser.py` — NEW (26 tests; verified 2026-06-15)
 - `tests/test_nova_botv2_adapter.py` — NEW (21 tests)
 - `tests/test_multi_source_merger.py` — NEW (17 tests)
 - `tests/test_market_regime_adapter.py` — NEW (27 tests)
@@ -155,7 +174,7 @@ cd C:\NovaGPT\Apps\NovaTacticBot
 - NovaAllocationBot adapter (TACTIC-DC-006)
 - NovaMemoryBot adapter (TACTIC-DC-007)
 - NovaBridge adapter (TACTIC-DC-008)
-- Historical baseline trend analysis (TACTIC-HA-005) — blocked on MASTER-005 ✓ + MASTER-007 ✓ → now unblocked
+- Cross-run / historical baseline trend analysis (TACTIC-HA-005) — **DONE** (built + 26 tests; research/diagnostic-only, not runtime-wired)
 - Regime-strategy fit matrix (TACTIC-RA-003)
 - JSON analytics export (TACTIC-RP-002)
 - Multi-source data merge (TACTIC-DC-009) — blocked on MASTER-032 (human approval)
@@ -164,7 +183,8 @@ cd C:\NovaGPT\Apps\NovaTacticBot
 
 ## Recommended Next Steps
 
-1. **TACTIC-HA-005** — Cross-run trend analysis (unblocked now by run_history ✓ + baseline ✓)
-2. **MASTER-022** — NovaBridge TacticBot adapter (unblocked by result_snapshot ✓)
-3. **TACTIC-RP-002** — JSON analytics export
-4. **TACTIC-RA-003** — Regime-strategy fit matrix
+1. **MASTER-022** — NovaBridge TacticBot adapter (unblocked by result_snapshot ✓)
+2. **TACTIC-RP-002** — JSON analytics export
+3. **TACTIC-RA-003** — Regime-strategy fit matrix
+
+> TACTIC-HA-005 (cross-run trend analysis) is complete — see "Latest Status — 2026-06-15".

@@ -209,5 +209,101 @@ class TestThresholdConstants(unittest.TestCase):
         self.assertEqual(VOLUME_SHIFT_THRESHOLD, 0.30)
 
 
+class TestFailClosedPartialRecords(unittest.TestCase):
+    """Partial/empty baseline records must not crash or invent flags.
+
+    Verifies the analyser stays fail-closed when comparators are absent:
+    missing metrics are skipped, never coerced into a fabricated trend.
+    """
+
+    def _analyser_with_baselines(self, baselines: list[dict]) -> CrossRunTrendAnalyser:
+        tmpdir = tempfile.mkdtemp()
+        bl_file = Path(tmpdir) / "analytics_baseline.json"
+        hist_file = Path(tmpdir) / "run_history.json"
+        _write_baselines(bl_file, baselines)
+        return CrossRunTrendAnalyser(bl_file, hist_file)
+
+    def test_empty_dict_records_fail_closed(self):
+        # Two structurally-empty snapshots: enough to pass the <2 guard, but
+        # every metric is absent. Must not crash and must invent no flags.
+        report = self._analyser_with_baselines([{}, {}]).analyse()
+        self.assertFalse(report.has_significant_changes())
+        self.assertIsNone(report.win_rate_delta)
+        self.assertEqual(report.current_event_count, 0)
+        self.assertTrue(len(report.observations) > 0)
+
+    def test_missing_keys_do_not_fabricate_flags(self):
+        # Prior missing win_rate + strategy_distribution; current carries only an
+        # event count. No flag may be invented from absent comparators.
+        prior = {"total_events": 100}
+        current = {"total_events": 110}
+        report = self._analyser_with_baselines([prior, current]).analyse()
+        flags = [f.flag for f in report.flags]
+        self.assertNotIn("SIGNIFICANT_WIN_RATE_SHIFT", flags)
+        self.assertNotIn("STRATEGY_MIX_CHANGE", flags)
+        self.assertIsNone(report.win_rate_delta)
+
+    def test_partial_win_rate_averages_only_present_values(self):
+        # win_rate present on only some priors: the average is taken over the
+        # present values; absent ones are skipped, never coerced to 0.
+        prior = [_make_baseline(0.60), _make_baseline(None), _make_baseline(0.60)]
+        current = _make_baseline(0.61)
+        report = self._analyser_with_baselines(prior + [current]).analyse()
+        self.assertAlmostEqual(report.recent_avg_win_rate, 0.60, places=2)
+
+
+class TestSmallSampleVisibility(unittest.TestCase):
+    """The report must expose how few baselines a verdict rests on."""
+
+    def _analyser_with_baselines(self, baselines: list[dict]) -> CrossRunTrendAnalyser:
+        tmpdir = tempfile.mkdtemp()
+        bl_file = Path(tmpdir) / "analytics_baseline.json"
+        hist_file = Path(tmpdir) / "run_history.json"
+        _write_baselines(bl_file, baselines)
+        return CrossRunTrendAnalyser(bl_file, hist_file)
+
+    def test_baselines_compared_is_one_with_two_baselines(self):
+        # Only a single prior snapshot to compare against: baselines_compared
+        # must reflect that small sample so consumers treat it as diagnostic,
+        # even when a threshold-crossing shift is flagged.
+        report = self._analyser_with_baselines(
+            [_make_baseline(0.70), _make_baseline(0.55)]
+        ).analyse()
+        self.assertEqual(report.baselines_compared, 1)
+
+
+class TestDeterminism(unittest.TestCase):
+    """Same input must yield identical flags + observations.
+
+    The analyser uses no wall-clock and no randomness, so repeated passes over
+    identical synthetic baselines must produce byte-stable summaries.
+    """
+
+    def test_repeated_analysis_is_deterministic(self):
+        tmpdir = tempfile.mkdtemp()
+        bl_file = Path(tmpdir) / "analytics_baseline.json"
+        hist_file = Path(tmpdir) / "run_history.json"
+        baselines = (
+            [_make_baseline(
+                0.70, total_events=100,
+                strategy_distribution={"MOMENTUM": 50, "MEAN_REV": 30, "BREAKOUT": 20},
+            )] * 3
+            + [_make_baseline(
+                0.55, total_events=160,
+                strategy_distribution={"MOMENTUM": 50, "SCALP": 30, "BREAKOUT": 20},
+            )]
+        )
+        _write_baselines(bl_file, baselines)
+
+        r1 = CrossRunTrendAnalyser(bl_file, hist_file).analyse()
+        r2 = CrossRunTrendAnalyser(bl_file, hist_file).analyse()
+
+        self.assertEqual(
+            [(f.flag, f.detail) for f in r1.flags],
+            [(f.flag, f.detail) for f in r2.flags],
+        )
+        self.assertEqual(r1.observations, r2.observations)
+
+
 if __name__ == "__main__":
     unittest.main()
