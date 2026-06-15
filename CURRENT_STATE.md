@@ -23,6 +23,28 @@
   risk/capital settings, deploy, NovaBotV2 producer output, or live cycle was
   touched. No real runtime/outcome data was read; all fixtures are synthetic.
 
+### 2026-06-15 — safe research batch (TC-001/002/004/005)
+
+- **TACTIC-RP-002 (JSON analytics export):** a research-only serializer
+  `research/analytics_json_export.py` now renders an `AnalyticsResult` to a
+  deterministic, ASCII-safe JSON dict/string (sibling of the Markdown report). It
+  is diagnostic-only, propagates `data_is_real` (never invents it), writes nothing
+  by default, and is **not wired** into `tools/run_tacticbot.py`. A future
+  runtime/report-wired export remains a separate, human-reviewed step.
+- **TACTIC-RA-003 (regime-strategy fit matrix):** a research-only
+  `research/regime_strategy_fit.py` builds a regime x strategy fit matrix from
+  `TacticalEvent`s. Per-cell win rates are **withheld below the `min_sample=30`
+  floor** (NEXT-016), unknown/None regimes fail closed to `UNKNOWN`, and the matrix
+  is diagnostic-only — never a trusted edge. Not wired into the runner.
+- **TACTIC-PR / NEXT-016 test hardening:** added synthetic-only fail-closed cases
+  to `tests/test_pattern_recognition.py` (non-positive prices, open/close outside
+  `[low, high]`) and provenance/returns invariants to
+  `tests/test_pattern_outcome_bridge.py` (synthetic or mixed-provenance data never
+  becomes a trusted/real edge even at sample size; averages withheld without returns).
+- Full NovaTacticBot suite now passes at **502 tests + 197 subtests** (broker-free
+  venv, synthetic fixtures only). No app runner/scheduler wiring, no real
+  runtime/outcome reads, no broker/order/secrets/risk/capital/deploy were touched.
+
 ---
 
 ## Latest Status — 2026-06-12
@@ -175,8 +197,8 @@ cd C:\NovaGPT\Apps\NovaTacticBot
 - NovaMemoryBot adapter (TACTIC-DC-007)
 - NovaBridge adapter (TACTIC-DC-008)
 - Cross-run / historical baseline trend analysis (TACTIC-HA-005) — **DONE** (built + 26 tests; research/diagnostic-only, not runtime-wired)
-- Regime-strategy fit matrix (TACTIC-RA-003)
-- JSON analytics export (TACTIC-RP-002)
+- Regime-strategy fit matrix (TACTIC-RA-003) — **research-only done** (`research/regime_strategy_fit.py`, diagnostic-only, sample-gated, not runtime-wired); runtime/report wiring still open
+- JSON analytics export (TACTIC-RP-002) — **research-only done** (`research/analytics_json_export.py`, diagnostic-only, not runtime-wired); runtime/report wiring still open
 - Multi-source data merge (TACTIC-DC-009) — blocked on MASTER-032 (human approval)
 
 ---
@@ -184,7 +206,11 @@ cd C:\NovaGPT\Apps\NovaTacticBot
 ## Recommended Next Steps
 
 1. **MASTER-022** — NovaBridge TacticBot adapter (unblocked by result_snapshot ✓)
-2. **TACTIC-RP-002** — JSON analytics export
-3. **TACTIC-RA-003** — Regime-strategy fit matrix
+2. **TACTIC-RP-002 / TACTIC-RA-003 runtime wiring** — promote the research-only
+   JSON exporter and regime-strategy fit matrix into report/runtime output behind a
+   reviewed, human-gated promotion (real-data + ≥30 sample gates still apply)
+3. **TACTIC-HA-006** — PnL distribution analysis (synthetic-fixture research candidate)
 
 > TACTIC-HA-005 (cross-run trend analysis) is complete — see "Latest Status — 2026-06-15".
+> TACTIC-RP-002 and TACTIC-RA-003 have research-only implementations — see the
+> "2026-06-15 — safe research batch" status block above.

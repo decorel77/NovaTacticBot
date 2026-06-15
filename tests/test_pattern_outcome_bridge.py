@@ -219,6 +219,48 @@ class ThresholdTests(unittest.TestCase):
 
 
 # --------------------------------------------------------------------------- #
+# NEXT-016 provenance / returns invariants beyond the basic threshold tests
+# --------------------------------------------------------------------------- #
+class Next016ProvenanceFloorTests(unittest.TestCase):
+    """Synthetic and mixed-provenance data never become a trusted/real edge even
+    at sample size, and averages are withheld when returns are absent."""
+
+    def _records(self, n, *, outcome="WIN", real=True, return_pct=1.0):
+        return [
+            OutcomeRecord(f"2024-08-{i + 1:02d}", "TREND_PULLBACK", outcome, return_pct, real)
+            for i in range(n)
+        ]
+
+    def test_synthetic_at_sample_size_shows_rate_but_never_real_or_trusted(self):
+        diag = summarize_outcomes(self._records(30, real=False), min_sample=30)
+        s = diag.by_setup["TREND_PULLBACK"]
+        self.assertEqual(1.0, s.win_rate)               # a number can render...
+        self.assertEqual("OK", s.win_rate_status)
+        self.assertFalse(s.data_is_real)                # ...but synthetic stays synthetic
+        self.assertEqual(STATUS_INSUFFICIENT, s.status)  # and is never a trusted edge
+        self.assertFalse(diag.data_is_real)
+        self.assertEqual(STATUS_INSUFFICIENT, diag.status)
+
+    def test_one_synthetic_record_blocks_real_trust_at_threshold(self):
+        records = self._records(29, real=True) + self._records(1, real=False)
+        diag = summarize_outcomes(records, min_sample=30)
+        s = diag.by_setup["TREND_PULLBACK"]
+        self.assertEqual(30, s.sample_count)
+        self.assertEqual(29, s.real_sample_count)
+        self.assertFalse(s.data_is_real)                # one synthetic taints the group
+        self.assertEqual(STATUS_INSUFFICIENT, s.status)  # real sample below floor
+        self.assertFalse(diag.data_is_real)
+
+    def test_average_return_withheld_when_returns_absent_even_at_floor(self):
+        diag = summarize_outcomes(self._records(30, real=True, return_pct=None), min_sample=30)
+        s = diag.by_setup["TREND_PULLBACK"]
+        self.assertEqual(1.0, s.win_rate)               # win rate present at floor
+        self.assertIsNone(s.average_return_pct)         # but average withheld (no returns)
+        self.assertEqual(STATUS_DIAGNOSTIC, s.status)
+        self.assertTrue(s.data_is_real)
+
+
+# --------------------------------------------------------------------------- #
 # Markdown rendering
 # --------------------------------------------------------------------------- #
 class MarkdownTests(unittest.TestCase):

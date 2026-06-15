@@ -447,6 +447,44 @@ class FailClosedTests(unittest.TestCase):
 
 
 # --------------------------------------------------------------------------- #
+# Dataset-level OHLC validation gaps (research-doc contract, not yet pinned)
+# --------------------------------------------------------------------------- #
+class DatasetValidationGapTests(unittest.TestCase):
+    """Fail-closed paths documented in pattern_recognition_research.md but not
+    previously covered: non-positive prices and open/close outside [low, high]."""
+
+    def _good(self):
+        return [
+            _bar("2024-01-01", 100, 101, 99, 100, 1000),
+            _bar("2024-01-02", 100, 110, 100, 108, 1000),
+            _bar("2024-01-03", 108, 112, 106, 110, 1000),
+        ]
+
+    def test_non_positive_price_fails_closed(self):
+        bars = self._good()
+        bars[1] = _bar("2024-01-02", 100, 110, -1, 108, 1000)  # low <= 0
+        report = scan_patterns(bars, symbol="X", data_is_real=True)
+        self.assertFalse(report.ok)
+        self.assertEqual((), report.signals)
+        self.assertFalse(report.data_is_real)  # forced false despite caller asserting true
+        self.assertTrue(any("must be positive" in e for e in report.errors))
+
+    def test_close_outside_high_low_fails_closed(self):
+        bars = self._good()
+        bars[1] = _bar("2024-01-02", 100, 110, 100, 120, 1000)  # close 120 > high 110
+        report = scan_patterns(bars, symbol="X")
+        self.assertFalse(report.ok)
+        self.assertTrue(any("close" in e and "outside [low, high]" in e for e in report.errors))
+
+    def test_open_outside_high_low_fails_closed(self):
+        bars = self._good()
+        bars[1] = _bar("2024-01-02", 90, 110, 100, 108, 1000)  # open 90 < low 100
+        report = scan_patterns(bars, symbol="X")
+        self.assertFalse(report.ok)
+        self.assertTrue(any("open" in e and "outside [low, high]" in e for e in report.errors))
+
+
+# --------------------------------------------------------------------------- #
 # Rendering / CLI
 # --------------------------------------------------------------------------- #
 class RenderCliTests(unittest.TestCase):
