@@ -167,6 +167,70 @@ for s in report.detected:
 The CLI **never asserts realness** (`data_is_real=False`); the checked-in
 fixtures are synthetic and exist only to pin the maths.
 
+## Report layer (`research/pattern_report.py`)
+
+A thin, research-only **formatting** layer that turns a `PatternScanReport` into
+a human-readable Markdown diagnostic. It adds **no** new capability beyond
+rendering: no broker/data-feed/network access, no risk/capital settings, no
+writes by default (the CLI prints to stdout), and it is **not** wired into
+`tools/run_tacticbot.py` or any scheduler. A `SafetyTests` case pins the
+broker/network import ban and asserts the runner does not import it.
+
+### How it works
+
+- `build_markdown_report(report, *, title=..., generated_at=None)` renders a
+  `PatternScanReport` to Markdown with: a metadata block (`generated_at`,
+  `research_only: true`, `data_is_real`, `broker_execution`, status), an input
+  quality summary, a **detected patterns** table, a **not-detected / fail-closed**
+  table (with the `fail_closed_reason` and `missing_data`), a per-pattern
+  **evidence summary**, **missing-data warnings**, scan **notes**, an explicit
+  *Not trading advice* disclaimer, and **future integration notes**.
+- `report_from_dict(data)` rebuilds a `PatternScanReport` from `report_to_dict`
+  output, so a serialized scan can be rendered later. It **fails closed
+  structurally**: missing fields fall back to safe defaults and `data_is_real`
+  defaults to `false` — it never invents realness.
+- `research_only` and `data_is_real` are taken **verbatim** from the input
+  report. The layer never upgrades realness; a dataset scanned through the CLI is
+  always `data_is_real=false`, and a dataset that failed validation renders
+  `status: FAILED_CLOSED` with `data_is_real: false` and no detected rows.
+- All **printed** text is ASCII so the report renders on any console codepage and
+  in redirected pipelines; the source/docs may still use richer punctuation.
+
+### CLI (offline, synthetic by default)
+
+```bash
+# from the repo root, using its broker-free venv
+# 1) a synthetic pattern dataset fixture -> scanned offline, then rendered
+.\.venv\Scripts\python.exe -m research.pattern_report `
+    tests/fixtures/patterns/outcomes_clusters.json `
+    --consolidation-window 6 --volume-window 6 --trend-window 6 --lookback 8
+
+# 2) a serialized scan report (report_to_dict JSON) -> rendered as-is
+.\.venv\Scripts\python.exe -m research.pattern_report path/to/scan_report.json
+```
+
+The CLI auto-detects the input shape: a dict with `bars` is treated as a dataset
+and **scanned with `data_is_real=false`**; a dict with `signals` + `research_only`
+is treated as a serialized report and rendered with its flags propagated. Any
+other shape is rejected (exit code 2). It writes no files and contacts nothing.
+
+### What it cannot do
+
+It **cannot place, modify, or cancel anything**, cannot reach a broker or any
+data feed, cannot change risk or capital, and cannot influence a live decision.
+The Markdown is descriptive evidence only. A test asserts the rendered report
+contains no order/live-action wording.
+
+### Before any future diagnostic-only integration
+
+Same gates as the recognition module, plus: a future report step would, at most,
+consume `report_to_dict(report)` read-only as a **static research artifact** next
+to the existing analytics, **behind an explicit research/diagnostic flag**, never
+by default in the runner or any scheduler, and only after a deliberate
+human-reviewed promotion and real out-of-sample sample sizes (the NEXT-016
+≥30-per-setup gate). Even then it would stay descriptive and never gain
+broker/order/risk authority.
+
 ## Known limitations
 
 - **Transparent heuristics, not models.** Confidence is a bounded formula per
