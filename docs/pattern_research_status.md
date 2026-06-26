@@ -89,6 +89,40 @@ three pattern modules are imported only by each other and their tests:
 `pattern_report` imports `pattern_recognition` (`:30-36`); `pattern_outcome_bridge`
 imports both (`:46-51`). Nothing reaches a broker/order/scheduler.
 
+### (d.1) Unwired status is now TEST-ENFORCED (PATTERN-009)
+
+Section (d) above is a manual grep *snapshot* — true at the audited HEAD but not
+self-defending against a future edit. As of PATTERN-009 the unwired property is
+also a standing, broker-free tripwire:
+
+- `tests/test_pattern_unwired_guard.py` (`PatternModulesUnwiredGuard`) parses the
+  **AST** of every `*.py` under the operational dirs `tools/`, `workflow/`,
+  `core/`, `adapters/` and fails if any of them imports the `research` package
+  (or specifically `pattern_recognition` / `pattern_outcome_bridge` /
+  `pattern_report` / `research_indicators`). It also asserts it actually scanned
+  files (no vacuous pass) and that `tools/run_tacticbot.py` names none of the
+  modules even as a string. This is broader than the per-module
+  `test_*_not_wired_into_runner` checks, which only look at `run_tacticbot.py`.
+- Each pattern module additionally has its own `SafetyTests`
+  (`test_pattern_recognition.py`, `test_pattern_outcome_bridge.py`,
+  `test_pattern_report.py`) asserting it imports no broker/network/order token
+  (incl. `nova_koopbot`, `nova_verkoopbot`, `place_order`, `workflow.nova_scheduler`).
+- The research-only indicator prototype carries the same guard
+  (`test_research_indicators.py::SafetyTests`).
+
+Net effect: wiring a pattern/research module into a runner, scheduler, adapter,
+or order path now **fails CI broker-free**. Promotion is a deliberate
+HUMAN_GATED act that must update these guards on purpose (see PATTERN-005/006).
+
+### (d.2) Count transparency is test-pinned (PATTERN-008)
+
+`tests/test_pattern_outcome_bridge.py::OutcomeCountVisibilityTests` pins that the
+raw sample counts (`total/real/real-needed`, and per-setup `samples/real/wins/
+losses`) stay **visible** in both the diagnostic object and the markdown even
+while a sub-threshold `win_rate` is withheld — so `INSUFFICIENT_SAMPLE` is
+transparent (a reader sees how far below the floor a setup is), never an opaque
+blank, and the counts stay internally consistent (per-setup sums == totals).
+
 ## (e) The ≥30 real-outcome gate (NEXT-016)
 
 - `pattern_outcome_bridge.DEFAULT_MIN_SAMPLE = 30` (`:58`).
