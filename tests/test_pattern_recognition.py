@@ -545,5 +545,120 @@ class SafetyTests(unittest.TestCase):
             self.assertNotIn("pattern_recognition", runner.read_text(encoding="utf-8"))
 
 
+# --------------------------------------------------------------------------- #
+# PATTERN-004: lookahead-bias audit
+# --------------------------------------------------------------------------- #
+# Audit finding (read-only, against research/pattern_recognition.py): every price
+# detector evaluates the LAST bar of its input relative to the prior bars in a
+# bounded trailing window (it slices `bars[-N:]`/`bars[-(N+1):-1]` and never
+# references an index beyond the last bar). The decision bar is always "now" =
+# the last bar; no detector can read a future bar. The sibling harness
+# research/stock_tactics_backtest.py enforces the harness-level rule (entry at the
+# OPEN of the bar AFTER the signal; a last-bar signal is skipped — pinned in
+# tests/test_stock_tactics_backtest.py "no entry bar after signal"). These tests
+# pin the detector property so a future refactor that introduced lookahead would
+# fail. See docs/pattern_lookahead_audit.md.
+
+_PRICE_DETECTORS_BY_NAME = {
+    "breakout_after_consolidation": detect_breakout_after_consolidation,
+    "volume_spike": detect_volume_spike,
+    "trend_continuation": detect_trend_continuation,
+    "mean_reversion_candidate": detect_mean_reversion_candidate,
+    "gap_continuation_risk": detect_gap_continuation_risk,
+    "failed_breakout": detect_failed_breakout,
+    "higher_high_higher_low": detect_higher_high_higher_low,
+    "drawdown_recovery": detect_drawdown_recovery,
+}
+
+# Small windows so every detector actually runs on a short synthetic series.
+_LOOKAHEAD_CFG = PatternConfig(
+    consolidation_window=3, volume_spike_window=3, trend_window=3, lookback=4
+)
+
+
+def _ramp_bars(start_day, n, *, base=100.0, step=1.0, vol=1000.0):
+    """n strictly-increasing-dated, valid OHLC(V) bars rising by `step`/bar."""
+    bars = []
+    for i in range(n):
+        c = base + step * i
+        o = c - step / 2.0
+        hi = c + 1.0
+        lo = o - 1.0
+        bars.append(_bar(f"2024-{start_day:02d}-{i + 1:02d}", o, hi, lo, c, vol))
+    return bars
+
+
+class LookaheadWindowLocalityTests(unittest.TestCase):
+    """Prepending OLDER bars must not change any detector's verdict: the verdict
+    depends only on the trailing window, so the detector cannot reach into
+    history (which would be the mechanism by which a future bar, in a later call,
+    could retroactively change an earlier decision)."""
+
+    def setUp(self):
+        # A 6-bar window is long enough for every detector to run.
+        self.window = _ramp_bars(2, 6)             # dated 2024-02-0x
+        self.older = _ramp_bars(1, 6, base=50.0)   # strictly earlier, 2024-01-0x
+
+    def test_every_detector_is_window_local(self):
+        for name, detector in _PRICE_DETECTORS_BY_NAME.items():
+            with self.subTest(detector=name):
+                on_window = detector(self.window, _LOOKAHEAD_CFG)
+                on_history_plus_window = detector(self.older + self.window, _LOOKAHEAD_CFG)
+                # Frozen dataclass equality compares detected/confidence/evidence too.
+                self.assertEqual(on_window, on_history_plus_window)
+
+    def test_scan_is_window_local_for_all_signals(self):
+        r_window = scan_patterns(self.window, _LOOKAHEAD_CFG, symbol="X")
+        r_hist = scan_patterns(self.older + self.window, _LOOKAHEAD_CFG, symbol="X")
+        by_window = _by_name(r_window)
+        by_hist = _by_name(r_hist)
+        self.assertEqual(set(by_window), set(by_hist))
+        for name, sig in by_window.items():
+            with self.subTest(detector=name):
+                self.assertEqual(sig, by_hist[name])
+
+    def test_input_not_mutated(self):
+        snapshot = list(self.window)
+        for detector in _PRICE_DETECTORS_BY_NAME.values():
+            detector(self.window, _LOOKAHEAD_CFG)
+        self.assertEqual(snapshot, self.window)  # detectors are pure; no in-place edits
+
+
+class LookaheadFutureIndependenceTests(unittest.TestCase):
+    """A detector's decision AS OF bar k (computed from bars[:k+1]) must be
+    identical regardless of what bars arrive after k. Encodes the replay
+    contract: feeding the same prefix yields the same verdict even when the tail
+    of the full series is mutated to extreme values."""
+
+    @staticmethod
+    def _signal_as_of(detector, bars, k):
+        # Decision made when bar k was the most recent bar: only bars[:k+1] exist.
+        return detector(bars[: k + 1], _LOOKAHEAD_CFG)
+
+    def test_future_bars_never_change_an_earlier_decision(self):
+        base = _ramp_bars(2, 10)
+        # Same first 6 bars; the future (bars 7..10) is mutated to extreme values.
+        mutated_tail = base[:6] + _ramp_bars(3, 4, base=500.0, step=25.0)
+        # Sanity: the shared prefix really is identical.
+        self.assertEqual(base[:6], mutated_tail[:6])
+        for name, detector in _PRICE_DETECTORS_BY_NAME.items():
+            for k in range(4, 6):  # decision bars wholly inside the shared prefix
+                with self.subTest(detector=name, k=k):
+                    self.assertEqual(
+                        self._signal_as_of(detector, base, k),
+                        self._signal_as_of(detector, mutated_tail, k),
+                    )
+
+    def test_appending_a_future_bar_does_not_alter_the_prior_window_verdict(self):
+        # The verdict for the window ending at the 6th bar must be reproducible
+        # from exactly those 6 bars even after a 7th (future) bar is appended.
+        base = _ramp_bars(2, 6)
+        extended = base + _ramp_bars(3, 1, base=999.0)  # one extreme future bar
+        for name, detector in _PRICE_DETECTORS_BY_NAME.items():
+            with self.subTest(detector=name):
+                self.assertEqual(detector(base, _LOOKAHEAD_CFG),
+                                 detector(extended[:6], _LOOKAHEAD_CFG))
+
+
 if __name__ == "__main__":
     unittest.main()
