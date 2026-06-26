@@ -204,9 +204,12 @@ class MarketRegimeBotAdapter(BaseAdapter):
 
         confidence_raw = payload.get("confidence", 0)
         try:
+            # OverflowError guards int(float("inf")) (json.loads parses a bare
+            # ``Infinity`` confidence) so a non-finite payload can't crash the
+            # export load; int(nan) raises ValueError, both -> confidence 0.
             confidence = int(confidence_raw)
             confidence = max(0, min(100, confidence))
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):
             confidence = 0
 
         risk_level = str(payload.get("risk_level") or "UNKNOWN")

@@ -313,5 +313,34 @@ class TestNoBrokerImports(unittest.TestCase):
         self.assertEqual(MarketRegimeBotAdapter.SOURCE_BOT, SourceBot.MARKET_REGIME_BOT)
 
 
+class TestNonFiniteConfidenceFailsClosed(unittest.TestCase):
+    """A non-finite confidence (NaN/+-Infinity, parsed by json.loads from a regime
+    export) must not crash the load; int(inf) raised OverflowError before."""
+
+    def _event_for(self, confidence) -> object:
+        tmpdir = Path(tempfile.mkdtemp())
+        _write(tmpdir, "regime_export.json", {**BULL_EXPORT, "confidence": confidence})
+        events = MarketRegimeBotAdapter(
+            tmpdir, allowed_dirs=_allowed_dirs_for(tmpdir), now=NOW
+        ).load()
+        return events
+
+    def test_infinity_confidence_does_not_crash(self):
+        events = self._event_for(float("inf"))
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0].score, 0.0)
+
+    def test_nan_and_neg_infinity_confidence_fail_closed(self):
+        for bad in (float("nan"), float("-inf")):
+            events = self._event_for(bad)
+            self.assertEqual(len(events), 1)
+            self.assertEqual(events[0].score, 0.0)
+
+    def test_finite_confidence_unchanged(self):
+        events = self._event_for(75)
+        self.assertEqual(len(events), 1)
+        self.assertAlmostEqual(events[0].score, 0.75)
+
+
 if __name__ == "__main__":
     unittest.main()
