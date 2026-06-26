@@ -22,6 +22,7 @@ from research.pattern_outcome_bridge import (
     build_diagnostic_markdown,
     load_outcomes_dataset,
     outcomes_from_events,
+    samples_needed_to_threshold,
     summarize_outcomes,
     to_scan_report,
 )
@@ -258,6 +259,107 @@ class Next016ProvenanceFloorTests(unittest.TestCase):
         self.assertIsNone(s.average_return_pct)         # but average withheld (no returns)
         self.assertEqual(STATUS_DIAGNOSTIC, s.status)
         self.assertTrue(s.data_is_real)
+
+
+# --------------------------------------------------------------------------- #
+# PATTERN-002: threshold-distance reporting (how far the REAL sample is from the
+# floor). Purely additive — it never lowers the threshold or upgrades a win-rate.
+# --------------------------------------------------------------------------- #
+class ThresholdDistanceHelperTests(unittest.TestCase):
+    def test_distance_math(self):
+        self.assertEqual(30, samples_needed_to_threshold(0, 30))
+        self.assertEqual(1, samples_needed_to_threshold(29, 30))
+        self.assertEqual(0, samples_needed_to_threshold(30, 30))
+        self.assertEqual(0, samples_needed_to_threshold(45, 30))  # never negative
+
+    def test_distance_fails_safe_on_malformed_input(self):
+        # Malformed inputs collapse conservatively rather than crashing.
+        self.assertEqual(30, samples_needed_to_threshold(None, 30))
+        self.assertEqual(30, samples_needed_to_threshold("x", 30))
+        self.assertEqual(30, samples_needed_to_threshold(-5, 30))  # negative real -> 0
+        self.assertEqual(0, samples_needed_to_threshold(5, None))   # bad floor -> 0
+        self.assertEqual(0, samples_needed_to_threshold(5, -10))    # negative floor -> 0
+
+
+class ThresholdDistanceTests(unittest.TestCase):
+    def _real_wins(self, n):
+        return [
+            OutcomeRecord(f"2024-09-{i + 1:02d}", "TREND_PULLBACK", "WIN", 1.0, True)
+            for i in range(n)
+        ]
+
+    def test_synthetic_sample_needs_full_floor_of_real_outcomes(self):
+        # Synthetic records are real=False, so the real sample is 0 and the full
+        # floor is still needed — this is the current ~0-real reality.
+        diag = _summ("outcomes_bridge_clusters.json")
+        self.assertEqual(0, diag.total_real_sample_count)
+        self.assertEqual(DEFAULT_MIN_SAMPLE, diag.real_samples_needed)
+        for s in diag.by_setup.values():
+            self.assertEqual(0, s.real_sample_count)
+            self.assertEqual(DEFAULT_MIN_SAMPLE, s.real_samples_needed)
+
+    def test_distance_shrinks_to_zero_at_and_above_threshold(self):
+        below = summarize_outcomes(self._real_wins(29), min_sample=30)
+        self.assertEqual(1, below.real_samples_needed)
+        self.assertEqual(1, below.by_setup["TREND_PULLBACK"].real_samples_needed)
+        self.assertEqual(STATUS_INSUFFICIENT, below.status)  # withheld below floor
+
+        at = summarize_outcomes(self._real_wins(30), min_sample=30)
+        self.assertEqual(0, at.real_samples_needed)
+        self.assertEqual(0, at.by_setup["TREND_PULLBACK"].real_samples_needed)
+
+    def test_empty_input_reports_full_distance(self):
+        diag = summarize_outcomes([], min_sample=30)
+        self.assertEqual(0, diag.total_real_sample_count)
+        self.assertEqual(30, diag.real_samples_needed)
+
+    def test_distance_surfaced_in_markdown_and_scan_report(self):
+        diag = _summ("outcomes_bridge_insufficient.json")
+        md = build_diagnostic_markdown(diag, generated_at=FIXED_TIME)
+        self.assertIn("| real_outcomes_needed |", md)
+        self.assertIn("| Real needed |", md)  # per-setup column header
+        self.assertIn("need", md.lower())     # withholding note states the distance
+        evidence = to_scan_report(diag).signals[0].evidence
+        self.assertEqual(diag.real_samples_needed, evidence["real_samples_needed"])
+
+
+# --------------------------------------------------------------------------- #
+# PATTERN-002: real-vs-synthetic counts stay separated; distance uses REAL count.
+# --------------------------------------------------------------------------- #
+class RealVsSyntheticCountTests(unittest.TestCase):
+    def test_distance_uses_real_not_total_sample(self):
+        # 40 total but only 5 real -> still 25 real outcomes short of the floor,
+        # and the win-rate must stay withheld (real sample below floor).
+        records = (
+            [OutcomeRecord(f"2024-10-{i + 1:02d}", "BREAKOUT", "WIN", 1.0, True) for i in range(5)]
+            + [OutcomeRecord(f"2024-11-{i + 1:02d}", "BREAKOUT", "WIN", 1.0, False) for i in range(35)]
+        )
+        diag = summarize_outcomes(records, min_sample=30)
+        s = diag.by_setup["BREAKOUT"]
+        self.assertEqual(40, s.sample_count)
+        self.assertEqual(5, s.real_sample_count)
+        self.assertEqual(25, s.real_samples_needed)       # 30 - 5, not 30 - 40
+        self.assertEqual(25, diag.real_samples_needed)
+        self.assertFalse(s.data_is_real)                  # synthetic taints the group
+        self.assertEqual(STATUS_INSUFFICIENT, s.status)   # real sample below floor
+
+
+# --------------------------------------------------------------------------- #
+# PATTERN-002: the bridge does NOT dedup — dedup is the upstream adapter's job.
+# This pins that contract so duplicate outcomes can't be silently assumed away
+# (and conversely can't be silently merged): callers must feed deduplicated data.
+# --------------------------------------------------------------------------- #
+class NoDedupContractTests(unittest.TestCase):
+    def test_identical_records_are_each_counted(self):
+        dup = OutcomeRecord("2024-01-01", "BREAKOUT", "WIN", 1.0, True)
+        diag = summarize_outcomes([dup, dup, dup], min_sample=30)
+        s = diag.by_setup["BREAKOUT"]
+        self.assertEqual(3, s.sample_count)        # no silent dedup
+        self.assertEqual(3, s.real_sample_count)
+        self.assertEqual(27, s.real_samples_needed)  # 30 - 3 (raw count, as fed)
+        # Still far below the floor: nothing is upgraded to a trusted edge.
+        self.assertIsNone(s.win_rate)
+        self.assertEqual(STATUS_INSUFFICIENT, diag.status)
 
 
 # --------------------------------------------------------------------------- #

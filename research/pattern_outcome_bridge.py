@@ -91,6 +91,7 @@ class SetupOutcomeSummary:
     setup_label: str
     sample_count: int
     real_sample_count: int
+    real_samples_needed: int        # max(0, min_sample - real_sample_count)
     win_count: int
     loss_count: int
     breakeven_count: int
@@ -115,6 +116,7 @@ class OutcomeDiagnostic:
     min_sample: int
     total_sample_count: int
     total_real_sample_count: int
+    real_samples_needed: int        # max(0, min_sample - total_real_sample_count)
     bars_analysed: int              # always 0 — no OHLCV is read or fabricated
     ohlcv_used: bool                # always False
     setup_labels: tuple[str, ...]
@@ -146,6 +148,29 @@ def normalize_outcome(raw: Any) -> str:
     """Normalize an outcome label, failing closed to UNKNOWN."""
     text = str(raw).strip().upper() if raw is not None else ""
     return text if text in _KNOWN_OUTCOMES else "UNKNOWN"
+
+
+def samples_needed_to_threshold(real_count: Any, min_sample: Any) -> int:
+    """How many MORE real outcomes are needed before the sample reaches the floor.
+
+    Returns ``max(0, min_sample - real_count)`` over coerced non-negative ints.
+    Fails safe: malformed/negative inputs collapse to a conservative distance
+    (treat real_count as 0, min_sample as itself-or-0). This number is for
+    *reporting only* — it never lowers the threshold or upgrades any win-rate.
+    """
+    try:
+        floor = int(min_sample)
+    except (TypeError, ValueError):
+        floor = 0
+    if floor < 0:
+        floor = 0
+    try:
+        have = int(real_count)
+    except (TypeError, ValueError):
+        have = 0
+    if have < 0:
+        have = 0
+    return max(0, floor - have)
 
 
 def _longest_clusters(outcomes: Sequence[str]) -> tuple[int, int]:
@@ -237,6 +262,7 @@ def summarize_outcomes(
             min_sample=min_sample,
             total_sample_count=0,
             total_real_sample_count=0,
+            real_samples_needed=samples_needed_to_threshold(0, min_sample),
             bars_analysed=0,
             ohlcv_used=False,
             setup_labels=(),
@@ -286,6 +312,7 @@ def summarize_outcomes(
             setup_label=label,
             sample_count=sample,
             real_sample_count=real,
+            real_samples_needed=samples_needed_to_threshold(real, min_sample),
             win_count=win,
             loss_count=loss,
             breakeven_count=breakeven,
@@ -312,9 +339,11 @@ def summarize_outcomes(
         f"({total_real} real); not a price pattern and not trading advice."
     )
     if overall_status == STATUS_INSUFFICIENT:
+        needed = samples_needed_to_threshold(total_real, min_sample)
         notes.append(
-            f"INSUFFICIENT_SAMPLE: {total_real} real outcome(s) < min_sample {min_sample}; "
-            f"per-setup win rates are withheld and nothing here is a trusted edge."
+            f"INSUFFICIENT_SAMPLE: {total_real} real outcome(s) < min_sample {min_sample} "
+            f"(need {needed} more real outcome(s) to reach the floor); per-setup win "
+            f"rates are withheld and nothing here is a trusted edge."
         )
 
     return OutcomeDiagnostic(
@@ -327,6 +356,7 @@ def summarize_outcomes(
         min_sample=min_sample,
         total_sample_count=total,
         total_real_sample_count=total_real,
+        real_samples_needed=samples_needed_to_threshold(total_real, min_sample),
         bars_analysed=0,
         ohlcv_used=False,
         setup_labels=tuple(sorted(by_label)),
@@ -415,6 +445,7 @@ def build_diagnostic_markdown(
     lines.append(f"| total_outcomes | {diag.total_sample_count} |")
     lines.append(f"| real_outcomes | {diag.total_real_sample_count} |")
     lines.append(f"| min_sample_threshold | {diag.min_sample} |")
+    lines.append(f"| real_outcomes_needed | {diag.real_samples_needed} |")
     lines.append(f"| setups_present | {', '.join(diag.setup_labels) or '-'} |")
     lines.append(f"| status | {diag.status} |")
     lines.append("")
@@ -433,13 +464,14 @@ def build_diagnostic_markdown(
     lines.append("")
     if diag.by_setup:
         lines.append(
-            "| Setup | Samples | Real | Wins | Losses | Win rate | Avg return % "
-            "| Longest win | Longest loss | data_is_real | Status |"
+            "| Setup | Samples | Real | Real needed | Wins | Losses | Win rate "
+            "| Avg return % | Longest win | Longest loss | data_is_real | Status |"
         )
-        lines.append("|---|---|---|---|---|---|---|---|---|---|---|")
+        lines.append("|---|---|---|---|---|---|---|---|---|---|---|---|")
         for label, s in diag.by_setup.items():
             lines.append(
-                f"| {label} | {s.sample_count} | {s.real_sample_count} | {s.win_count} "
+                f"| {label} | {s.sample_count} | {s.real_sample_count} "
+                f"| {s.real_samples_needed} | {s.win_count} "
                 f"| {s.loss_count} | {_cell(s.win_rate)} | {_cell(s.average_return_pct)} "
                 f"| {s.longest_win_cluster} | {s.longest_loss_cluster} "
                 f"| {_md_bool(s.data_is_real)} | {s.status} |"
@@ -478,6 +510,7 @@ def to_scan_report(diag: OutcomeDiagnostic) -> PatternScanReport:
         "status": diag.status,
         "total_sample_count": diag.total_sample_count,
         "total_real_sample_count": diag.total_real_sample_count,
+        "real_samples_needed": diag.real_samples_needed,
         "min_sample": diag.min_sample,
         "ohlcv_used": diag.ohlcv_used,
         "by_setup": {label: asdict(s) for label, s in diag.by_setup.items()},
