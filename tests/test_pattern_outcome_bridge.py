@@ -439,6 +439,86 @@ class CliTests(unittest.TestCase):
 
 
 # --------------------------------------------------------------------------- #
+# PATTERN-008: raw outcome COUNTS stay visible even when the win-rate is
+# withheld. A reader must always be able to see how far below the floor a setup
+# is (samples / real / real-needed / wins / losses), so "INSUFFICIENT_SAMPLE" is
+# transparent rather than an opaque blank. These tests pin that the counts are
+# surfaced in both the diagnostic object and the markdown, and stay internally
+# consistent — without ever exposing a sub-threshold win-rate.
+# --------------------------------------------------------------------------- #
+class OutcomeCountVisibilityTests(unittest.TestCase):
+    def setUp(self):
+        self.diag = _summ("outcomes_bridge_insufficient.json")
+        self.md = build_diagnostic_markdown(self.diag, generated_at=FIXED_TIME)
+
+    def test_summary_table_surfaces_the_count_rows(self):
+        # The header summary table exposes the totals + threshold distance.
+        self.assertIn("| total_outcomes | 4 |", self.md)
+        self.assertIn("| real_outcomes | 0 |", self.md)
+        self.assertIn("| min_sample_threshold | 30 |", self.md)
+        self.assertIn("| real_outcomes_needed | 30 |", self.md)
+
+    def test_per_setup_table_header_has_count_columns(self):
+        header = next(
+            ln for ln in self.md.splitlines()
+            if ln.startswith("| Setup |")
+        )
+        for column in ("Samples", "Real", "Real needed", "Wins", "Losses"):
+            with self.subTest(column=column):
+                self.assertIn(column, header)
+
+    def test_sub_threshold_row_shows_counts_but_withholds_rate(self):
+        row = next(ln for ln in self.md.splitlines() if ln.startswith("| BREAKOUT |"))
+        cells = [c.strip() for c in row.strip().strip("|").split("|")]
+        # Setup, Samples, Real, Real needed, Wins, Losses, Win rate, ...
+        self.assertEqual(cells[0], "BREAKOUT")
+        self.assertEqual(cells[1], "4")    # samples visible
+        self.assertEqual(cells[2], "0")    # real visible
+        self.assertEqual(cells[3], "30")   # real-needed visible
+        self.assertEqual(cells[4], "3")    # wins visible
+        self.assertEqual(cells[5], "1")    # losses visible
+        self.assertEqual(cells[6], STATUS_INSUFFICIENT)  # win-rate withheld, not blank
+
+    def test_diagnostic_object_exposes_counts_with_rate_none(self):
+        s = self.diag.by_setup["BREAKOUT"]
+        self.assertEqual(s.sample_count, 4)
+        self.assertEqual(s.real_sample_count, 0)
+        self.assertEqual(s.real_samples_needed, 30)
+        self.assertEqual(s.win_count + s.loss_count, 4)
+        # The count is visible but the win-rate stays None (never a trusted edge).
+        self.assertIsNone(s.win_rate)
+        self.assertEqual(s.win_rate_status, STATUS_INSUFFICIENT)
+
+    def test_counts_are_internally_consistent(self):
+        # Per-setup counts must sum to the diagnostic totals, and the threshold
+        # distance must equal max(0, min_sample - real) at both levels.
+        for fixture in (
+            "outcomes_bridge_insufficient.json",
+            "outcomes_bridge_clusters.json",
+            "outcomes_bridge_reallike.json",
+        ):
+            with self.subTest(fixture=fixture):
+                d = _summ(fixture)
+                self.assertEqual(
+                    sum(s.sample_count for s in d.by_setup.values()),
+                    d.total_sample_count,
+                )
+                self.assertEqual(
+                    sum(s.real_sample_count for s in d.by_setup.values()),
+                    d.total_real_sample_count,
+                )
+                self.assertEqual(
+                    d.real_samples_needed,
+                    samples_needed_to_threshold(d.total_real_sample_count, d.min_sample),
+                )
+                for s in d.by_setup.values():
+                    self.assertEqual(
+                        s.real_samples_needed,
+                        samples_needed_to_threshold(s.real_sample_count, d.min_sample),
+                    )
+
+
+# --------------------------------------------------------------------------- #
 # Safety: no broker / network / runtime imports; not wired into the runner
 # --------------------------------------------------------------------------- #
 class SafetyTests(unittest.TestCase):
