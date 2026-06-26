@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
@@ -417,6 +418,12 @@ def _safe_float(value: Any) -> Optional[float]:
     if value is None or value == "":
         return None
     try:
-        return float(value)
+        number = float(value)
     except (TypeError, ValueError):
         return None
+    # A non-finite (NaN/+-Infinity, e.g. a bare ``Infinity`` parsed by json.loads
+    # from an options snapshot) must not leak downstream where it would poison
+    # numeric aggregates. Fail closed to None.
+    if not math.isfinite(number):
+        return None
+    return number
