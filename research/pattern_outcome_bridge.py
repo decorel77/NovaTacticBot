@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
@@ -136,7 +137,9 @@ def _to_float(value: Any) -> float | None:
         f = float(value)
     except (TypeError, ValueError):
         return None
-    return f if f == f else None  # guard NaN
+    # Reject non-finite: a NaN-only guard let +-Infinity leak into return_pct and
+    # the research outcome aggregates. Fail closed to None.
+    return f if math.isfinite(f) else None
 
 
 def normalize_outcome(raw: Any) -> str:

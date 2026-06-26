@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
@@ -66,7 +67,10 @@ def _to_float(value: Any) -> Optional[float]:
         f = float(value)
     except (TypeError, ValueError):
         return None
-    return f if f == f else None  # guard NaN
+    # Reject non-finite: a NaN-only guard let +-Infinity leak into realized_pnl
+    # (via _first_pnl), which poisons the analytics total_pnl sum and makes
+    # _decide_outcome misclassify (inf > 0 -> WIN). Fail closed to None.
+    return f if math.isfinite(f) else None
 
 
 def _parse_timestamp(raw: Any) -> Optional[datetime]:
