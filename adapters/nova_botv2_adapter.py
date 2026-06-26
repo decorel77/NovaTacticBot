@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 from pathlib import Path
 from typing import Any, Optional
 
@@ -38,6 +39,22 @@ def _safe_str(value: Any, default: str = "unknown") -> str:
     if value is None:
         return default
     return str(value)
+
+
+def _safe_int(value: Any, default: int = 0) -> int:
+    """Coerce a count field to a finite int.
+
+    A non-finite (NaN/+-Infinity, parsed by json.loads from an upstream snapshot)
+    or non-numeric value must never reach a raw ``int(...)`` cast, where it would
+    raise OverflowError/ValueError and crash the load. Fail closed to ``default``.
+    """
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return default
+    if not math.isfinite(number):
+        return default
+    return int(number)
 
 
 class NovaBotV2Adapter(BaseAdapter):
@@ -101,8 +118,8 @@ class NovaBotV2Adapter(BaseAdapter):
         )
         final_status = _safe_str(worker_entry.get("final_status"), "UNKNOWN")
         readiness_status = _safe_str(worker_entry.get("readiness_status"), "UNKNOWN")
-        queue_total = int(worker_entry.get("queue_total") or cycle.get("queue_total") or 0)
-        eligible_tasks = int(cycle.get("eligible_tasks") or 0)
+        queue_total = _safe_int(worker_entry.get("queue_total") or cycle.get("queue_total") or 0)
+        eligible_tasks = _safe_int(cycle.get("eligible_tasks") or 0)
         selected_task_id = _safe_str(worker_entry.get("selected_task_id"), "none")
         selected_priority = _safe_str(worker_entry.get("selected_task_priority"), "unknown")
         errors: list[str] = list(worker_entry.get("errors") or [])

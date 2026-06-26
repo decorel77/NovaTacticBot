@@ -161,6 +161,35 @@ class TestNovaBotV2AdapterScoring(unittest.TestCase):
             self.assertEqual(events[0].score, 0.0)
 
 
+class TestNonFiniteCountsFailClosed(unittest.TestCase):
+    """A non-finite queue_total / eligible_tasks (NaN/+-Infinity, parsed by
+    json.loads from an upstream snapshot) must not crash the load; the raw
+    int(... or 0) cast raised OverflowError/ValueError before."""
+
+    def _load(self, snapshot: dict) -> list:
+        tmpdir = Path(tempfile.mkdtemp())
+        _write_snapshot(tmpdir, snapshot)
+        return NovaBotV2Adapter(tmpdir).load()
+
+    def test_infinite_counts_do_not_crash(self):
+        snap = {
+            **READY_SNAPSHOT,
+            "worker_entrypoint": {**READY_SNAPSHOT["worker_entrypoint"],
+                                  "queue_total": float("inf")},
+            "cycle_report": {**READY_SNAPSHOT["cycle_report"],
+                             "queue_total": float("inf"), "eligible_tasks": float("nan")},
+        }
+        events = self._load(snap)
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0].metadata["queue_total"], 0)
+        self.assertEqual(events[0].metadata["eligible_tasks"], 0)
+
+    def test_finite_counts_unchanged(self):
+        events = self._load(READY_SNAPSHOT)
+        self.assertEqual(events[0].metadata["queue_total"], 3)
+        self.assertEqual(events[0].metadata["eligible_tasks"], 3)
+
+
 class TestNovaBotV2NoBrokerImports(unittest.TestCase):
     def test_no_broker_imports(self):
         import ast, pathlib
