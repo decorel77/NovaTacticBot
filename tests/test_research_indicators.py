@@ -18,6 +18,7 @@ from research.research_indicators import (
     compute_macd,
     compute_research_indicators,
     compute_volume_trend,
+    report_to_dict,
 )
 
 # Tiny periods so short synthetic series exercise the real code paths.
@@ -142,6 +143,100 @@ class AggregateAndDeterminismTests(unittest.TestCase):
         a = compute_research_indicators(RISING, [1.0] * 4 + [5.0, 5.0], CFG)
         b = compute_research_indicators(RISING, [1.0] * 4 + [5.0, 5.0], CFG)
         self.assertEqual(a, b)  # frozen dataclasses compare by value
+
+
+class IndicatorEdgeCaseTests(unittest.TestCase):
+    """TA-008: edge cases beyond the basic OK/fail-closed pins above —
+    exact length boundaries, every invalid-config branch, the mid==0 bandwidth
+    branch, degenerate volume baselines, and wrong-type top-level inputs."""
+
+    # ---- MACD ----------------------------------------------------------- #
+    def test_macd_exact_length_boundary(self):
+        # need = macd_slow + macd_signal = 4 + 2 = 6 for CFG.
+        self.assertEqual(STATUS_FAIL_CLOSED, compute_macd([1.0, 2, 3, 4, 5], CFG).status)
+        self.assertEqual(STATUS_OK, compute_macd([1.0, 2, 3, 4, 5, 6], CFG).status)
+
+    def test_macd_falling_series_is_negative(self):
+        r = compute_macd([17.0, 16, 15, 14, 13, 12, 11, 10], CFG)
+        self.assertEqual(STATUS_OK, r.status)
+        self.assertLess(r.macd, 0.0)
+
+    def test_macd_signal_period_below_one_fails_closed(self):
+        bad = ResearchIndicatorConfig(macd_fast=2, macd_slow=4, macd_signal=0)
+        self.assertEqual(STATUS_FAIL_CLOSED, compute_macd([1.0, 2, 3, 4, 5, 6], bad).status)
+
+    def test_macd_non_iterable_and_none_fail_closed(self):
+        for bad in (None, 123, 4.5):
+            with self.subTest(bad=bad):
+                self.assertEqual(STATUS_FAIL_CLOSED, compute_macd(bad, CFG).status)
+
+    # ---- Bollinger ------------------------------------------------------ #
+    def test_bollinger_invalid_params_fail_closed(self):
+        for cfg in (
+            ResearchIndicatorConfig(bb_period=4, bb_k=0.0),     # k <= 0
+            ResearchIndicatorConfig(bb_period=4, bb_k=-2.0),    # negative k
+            ResearchIndicatorConfig(bb_period=1, bb_k=2.0),     # period < 2
+        ):
+            with self.subTest(cfg=cfg):
+                r = compute_bollinger([1.0, 2, 3, 4], cfg)
+                self.assertEqual(STATUS_FAIL_CLOSED, r.status)
+                self.assertIn("invalid Bollinger params", r.fail_closed_reason)
+
+    def test_bollinger_exact_length_boundary(self):
+        self.assertEqual(STATUS_FAIL_CLOSED, compute_bollinger([10.0, 12, 11], CFG).status)
+        self.assertEqual(STATUS_OK, compute_bollinger([10.0, 12, 11, 13], CFG).status)
+
+    def test_bollinger_zero_mean_window_yields_none_bandwidth(self):
+        # A window that averages exactly 0 (with real dispersion) keeps status OK
+        # but cannot express bandwidth as a fraction of the mean -> None, not inf.
+        r = compute_bollinger([-2.0, -1.0, 1.0, 2.0], CFG)
+        self.assertEqual(STATUS_OK, r.status)
+        self.assertEqual(0.0, r.mid)
+        self.assertIsNone(r.bandwidth)
+        self.assertIsNotNone(r.percent_b)
+
+    def test_bollinger_non_iterable_and_none_fail_closed(self):
+        for bad in (None, 7):
+            with self.subTest(bad=bad):
+                self.assertEqual(STATUS_FAIL_CLOSED, compute_bollinger(bad, CFG).status)
+
+    # ---- Volume trend --------------------------------------------------- #
+    def test_volume_invalid_windows_fail_closed(self):
+        for cfg in (
+            ResearchIndicatorConfig(vol_short=4, vol_long=4),   # long <= short
+            ResearchIndicatorConfig(vol_short=0, vol_long=4),   # short < 1
+        ):
+            with self.subTest(cfg=cfg):
+                r = compute_volume_trend([1.0] * 6, cfg)
+                self.assertEqual(STATUS_FAIL_CLOSED, r.status)
+                self.assertIn("invalid volume windows", r.fail_closed_reason)
+
+    def test_volume_degenerate_zero_baseline_fails_closed(self):
+        r = compute_volume_trend([0.0, 0, 0, 0, 0, 0], CFG)
+        self.assertEqual(STATUS_FAIL_CLOSED, r.status)
+        self.assertIn("degenerate baseline", r.fail_closed_reason)
+
+    def test_volume_exact_length_boundary(self):
+        self.assertEqual(STATUS_FAIL_CLOSED, compute_volume_trend([1.0, 1, 1], CFG).status)
+        self.assertEqual(STATUS_OK, compute_volume_trend([1.0, 1, 1, 1], CFG).status)
+
+    def test_volume_bool_and_none_fail_closed(self):
+        self.assertEqual(STATUS_FAIL_CLOSED, compute_volume_trend([1.0, 2, True, 4], CFG).status)
+        self.assertEqual(STATUS_FAIL_CLOSED, compute_volume_trend(None, CFG).status)
+
+    # ---- Report serialization ------------------------------------------ #
+    def test_report_to_dict_round_trips(self):
+        rep = compute_research_indicators(RISING, [1.0] * 4 + [5.0, 5.0], CFG)
+        d = report_to_dict(rep)
+        self.assertEqual(
+            sorted(d.keys()),
+            ["bollinger", "broker_execution", "macd", "notes",
+             "research_only", "status", "volume_trend"],
+        )
+        self.assertTrue(d["research_only"])
+        self.assertEqual("disabled", d["broker_execution"])
+        # nested dataclasses are themselves dicts (asdict recursion)
+        self.assertEqual(d["macd"]["status"], rep.macd.status)
 
 
 class SafetyTests(unittest.TestCase):
