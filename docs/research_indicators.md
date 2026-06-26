@@ -49,6 +49,30 @@ broker/network package (via `utils.guardrails._BANNED_PACKAGES`), no
 reference no NovaBotV2 live-path module; and that `tools/run_tacticbot.py` does
 not import it. Determinism and the NaN/inf fail-closed cases are pinned too.
 
+## Now enforced repo-wide and cross-repo (PATTERN-009 + TA-008 + TA-009)
+
+The old "unwired" claim was a per-module check plus a manual grep. It is now a
+standing, broker-free tripwire on **both** sides of the boundary:
+
+- **NovaTacticBot (PATTERN-009).** `tests/test_pattern_unwired_guard.py` AST-scans
+  every `*.py` under `tools/`, `workflow/`, `core/`, `adapters/` and fails if any
+  imports the `research` package or `research_indicators` specifically — so a
+  future runner/scheduler/adapter that wired this prototype in is caught in CI.
+- **NovaBotV2 (TA-009).** `tests/test_live_signal_research_indicator_guard.py`
+  AST-scans the live TA/signal chain (`workflow/nova_signal_generator.py`,
+  `workflow/nova_market_scanner.py`, `utils/signal_setup_utils.py`,
+  `utils/market_data_utils.py`, `utils/indicators.py`) and fails if any of them
+  imports a research/experimental/prototype indicator (incl. `compute_macd` /
+  `compute_bollinger` / `compute_volume_trend`). The live set stays EMA20/EMA50 +
+  RSI + ATR. See NovaBotV2 `docs/ta_indicator_production_path.md` §TA-009.
+- **TA-008** broadened the edge-case coverage (length boundaries, every
+  invalid-config branch, zero-mean Bollinger window, degenerate volume baseline,
+  wrong-type inputs, `report_to_dict` round-trip).
+
+Net effect: importing this module into either repo's live signal path now **fails
+CI broker-free**. Promotion remains a deliberate HUMAN_GATED decision that must
+update these guards on purpose.
+
 ## Out of scope
 
 No wiring into any runner/scheduler or the live indicator path, no edge claim, no
