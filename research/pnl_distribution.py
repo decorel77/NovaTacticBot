@@ -165,7 +165,9 @@ def build_pnl_distribution(
     per_strategy: dict[str, dict[str, float]] = {}
 
     for e in event_list:
-        if e.event_type != EventType.TRADE_OUTCOME:
+        # Fail-closed on a non-event item (None / dict / str): skip it rather
+        # than raising AttributeError on a malformed stream.
+        if getattr(e, "event_type", None) != EventType.TRADE_OUTCOME:
             continue
         if not _is_finite_number(e.realized_pnl):
             continue

@@ -155,7 +155,9 @@ def build_holding_period_analysis(
     skipped_invalid = 0
 
     for e in event_list:
-        if e.event_type != EventType.TRADE_OUTCOME:
+        # Fail-closed on a non-event item (None / dict / str): skip it rather
+        # than raising AttributeError on a malformed stream.
+        if getattr(e, "event_type", None) != EventType.TRADE_OUTCOME:
             continue
         md = e.metadata or {}
         entry = _parse_dt(md.get("entry_time"))

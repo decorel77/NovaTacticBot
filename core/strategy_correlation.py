@@ -254,9 +254,12 @@ def _daily_pnl(
 
 
 def _exclusion_reason(
-    event: TacticalEvent, cfg: StrategyCorrelationConfig
+    event: object, cfg: StrategyCorrelationConfig
 ) -> str | None:
-    if event.event_type != EventType.TRADE_OUTCOME:
+    # Fail-closed on a non-event item (None / dict / str / anything lacking the
+    # TacticalEvent interface): exclude it rather than raising AttributeError, so
+    # a malformed stream is "excluded fail-closed" as the contract promises.
+    if getattr(event, "event_type", None) != EventType.TRADE_OUTCOME:
         return "not_trade_outcome"
     if event.outcome == Outcome.PENDING:
         return "outcome_pending"
