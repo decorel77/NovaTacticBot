@@ -16,6 +16,7 @@ ADVISORY_ONLY. No broker imports. Read-only.
 """
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
@@ -27,6 +28,21 @@ _DEFAULT_SYSTEM_DIR = Path(__file__).resolve().parents[1] / "data" / "system"
 
 WIN_RATE_SHIFT_THRESHOLD = 0.05   # 5 percentage points
 VOLUME_SHIFT_THRESHOLD = 0.30     # 30 percent
+
+
+def _finite_number(value: object) -> Optional[float]:
+    """Return ``value`` as a finite float, or ``None`` if it is not a real,
+    finite number (bool, ``None``, string, NaN, inf all fail closed).
+
+    A single corrupt baseline record (``total_events: null``/``"oops"`` or a
+    non-numeric ``overall_win_rate``) must never crash the whole trend pass — it
+    is treated as absent so the analysis degrades to "not enough data" instead of
+    raising.
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    f = float(value)
+    return f if math.isfinite(f) else None
 
 
 @dataclass
@@ -56,13 +72,17 @@ class TrendReport:
 
 def _recent_avg_win_rate(baselines: list[dict], n: int) -> Optional[float]:
     recent = baselines[-n:]
-    rates = [b.get("overall_win_rate") for b in recent if b.get("overall_win_rate") is not None]
+    rates = [r for r in (_finite_number(b.get("overall_win_rate")) for b in recent)
+             if r is not None]
     return sum(rates) / len(rates) if rates else None
 
 
 def _recent_avg_event_count(baselines: list[dict], n: int) -> Optional[float]:
     recent = baselines[-n:]
-    counts = [b.get("total_events", 0) for b in recent]
+    # A missing total_events counts as 0 (existing behaviour); a present-but-
+    # malformed value is skipped (fail-closed) rather than crashing the sum.
+    counts = [c for c in (_finite_number(b.get("total_events", 0)) for b in recent)
+              if c is not None]
     return sum(counts) / len(counts) if counts else None
 
 
@@ -107,7 +127,7 @@ class CrossRunTrendAnalyser:
         report.baselines_compared = n
 
         # --- Win rate trend ---
-        report.current_win_rate = current.get("overall_win_rate")
+        report.current_win_rate = _finite_number(current.get("overall_win_rate"))
         report.recent_avg_win_rate = _recent_avg_win_rate(prior, n)
 
         if report.current_win_rate is not None and report.recent_avg_win_rate is not None:
@@ -125,7 +145,8 @@ class CrossRunTrendAnalyser:
                 ))
 
         # --- Event volume trend ---
-        report.current_event_count = int(current.get("total_events", 0))
+        _current_events = _finite_number(current.get("total_events", 0))
+        report.current_event_count = int(_current_events) if _current_events is not None else 0
         report.recent_avg_event_count = _recent_avg_event_count(prior, n)
 
         if report.recent_avg_event_count and report.recent_avg_event_count > 0:

@@ -252,6 +252,62 @@ class TestFailClosedPartialRecords(unittest.TestCase):
         self.assertAlmostEqual(report.recent_avg_win_rate, 0.60, places=2)
 
 
+class TestFailClosedMalformedRecords(unittest.TestCase):
+    """Present-but-malformed metrics must fail closed, never crash (HARDEN-SWEEP-007).
+
+    Before the fix a single corrupt baseline record (``total_events: null`` /
+    ``"oops"`` or a non-numeric / non-finite ``overall_win_rate``) raised a
+    TypeError and took down the whole trend pass. Now such values are treated as
+    absent.
+    """
+
+    def _analyser_with_baselines(self, baselines: list[dict]) -> CrossRunTrendAnalyser:
+        tmpdir = tempfile.mkdtemp()
+        bl_file = Path(tmpdir) / "analytics_baseline.json"
+        hist_file = Path(tmpdir) / "run_history.json"
+        _write_baselines(bl_file, baselines)
+        return CrossRunTrendAnalyser(bl_file, hist_file)
+
+    def test_current_total_events_none_does_not_crash(self):
+        report = self._analyser_with_baselines(
+            [_make_baseline(total_events=10), {"overall_win_rate": 0.5, "total_events": None}]
+        ).analyse()
+        self.assertEqual(report.current_event_count, 0)
+
+    def test_prior_total_events_string_is_skipped(self):
+        # A garbage prior count must be skipped from the average, not crash.
+        prior = [{"overall_win_rate": 0.5, "total_events": "oops"},
+                 _make_baseline(0.5, total_events=10)]
+        current = _make_baseline(0.5, total_events=11)
+        report = self._analyser_with_baselines(prior + [current]).analyse()
+        # only the one finite prior count (10) averaged
+        self.assertAlmostEqual(report.recent_avg_event_count, 10.0, places=6)
+
+    def test_string_win_rate_is_treated_as_absent(self):
+        prior = [{"overall_win_rate": "bad", "total_events": 10},
+                 _make_baseline(0.60, total_events=12)]
+        current = _make_baseline(0.61, total_events=12)
+        report = self._analyser_with_baselines(prior + [current]).analyse()
+        # the malformed prior win_rate is skipped; average rests on the one good value
+        self.assertAlmostEqual(report.recent_avg_win_rate, 0.60, places=6)
+
+    def test_non_finite_win_rate_is_treated_as_absent(self):
+        prior = [{"overall_win_rate": float("inf"), "total_events": 10},
+                 _make_baseline(0.60, total_events=12)]
+        current = {"overall_win_rate": float("nan"), "total_events": 12}
+        report = self._analyser_with_baselines(prior + [current]).analyse()
+        self.assertIsNone(report.current_win_rate)           # NaN current -> absent
+        self.assertAlmostEqual(report.recent_avg_win_rate, 0.60, places=6)
+        self.assertIsNone(report.win_rate_delta)             # no delta without a current
+
+    def test_bool_total_events_is_not_treated_as_number(self):
+        # bool is an int subclass; True must not masquerade as 1 event.
+        report = self._analyser_with_baselines(
+            [_make_baseline(total_events=10), {"total_events": True}]
+        ).analyse()
+        self.assertEqual(report.current_event_count, 0)
+
+
 class TestSmallSampleVisibility(unittest.TestCase):
     """The report must expose how few baselines a verdict rests on."""
 
