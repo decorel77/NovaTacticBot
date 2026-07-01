@@ -7,8 +7,15 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Optional
+
+
+def _utcnow() -> datetime:
+    """Naive UTC 'now' — behaviour-identical to the deprecated ``datetime.utcnow()``
+    (scheduled for removal), but without the deprecation warning. Kept naive so the
+    serialized ``timestamp`` isoformat contract is byte-identical (no ``+00:00``)."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 # ── Enumerations (plain strings to avoid import friction across bots) ──────────
@@ -60,7 +67,7 @@ class TacticalEvent:
     strategy_id: str
 
     event_id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=_utcnow)
 
     regime: Optional[str] = None
     score: Optional[float] = None          # 0.0 – 1.0
@@ -120,7 +127,7 @@ class TacticalEvent:
             ts = datetime.fromisoformat(ts)
         return cls(
             event_id=data.get("event_id", str(uuid.uuid4())),
-            timestamp=ts or datetime.utcnow(),
+            timestamp=ts or _utcnow(),
             source_bot=data["source_bot"],
             event_type=data["event_type"],
             strategy_id=data["strategy_id"],

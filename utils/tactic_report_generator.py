@@ -9,7 +9,7 @@ Never writes outside the NovaTacticBot directory.
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
@@ -93,7 +93,7 @@ class TacticReportGenerator:
     # ── Sections ───────────────────────────────────────────────────────────────
 
     def _header(self, source: str) -> str:
-        ts = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+        ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
         return (
             f"# NovaTacticBot Intelligence Report\n\n"
             f"**Generated:** {ts}  \n"
@@ -314,7 +314,7 @@ class TacticReportGenerator:
         supplementary: "Optional[dict]" = None,
     ) -> str:
         """Render a standalone adapter_diagnostics.md report."""
-        ts = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+        ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
         sections = [
             f"# NovaTacticBot — Adapter Diagnostics\n\n"
             f"**Generated:** {ts}  \n"

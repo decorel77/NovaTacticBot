@@ -27,7 +27,7 @@ from __future__ import annotations
 import json
 import logging
 import math
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
@@ -175,7 +175,7 @@ class NovaBotV2TradeAdapter(BaseAdapter):
         timestamp = (
             _parse_timestamp(data.get("timestamp"))
             or _parse_timestamp(record.get("timestamp"))
-            or datetime.utcnow()
+            or datetime.now(timezone.utc).replace(tzinfo=None)
         )
 
         metadata = {
